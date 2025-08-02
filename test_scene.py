@@ -1,6 +1,3 @@
-import os
-import os.path as osp
-import pickle
 import time
 
 import hydra
@@ -9,7 +6,7 @@ import torch
 from omegaconf import DictConfig
 from collections import Counter
 from rich.progress import track
-from visualize import draw_scene
+from visual.occscannet_visualize import draw_scene, draw, draw_scene_test
 
 from ssc_pl import LitModule, build_data_loaders, pre_build_callbacks, build_from_configs, evaluation
 
@@ -61,8 +58,10 @@ def get_grid_coords(dims, resolution, vox_origin):
     g_zz = np.arange(0, dims[2])
 
     xx, yy, zz = np.meshgrid(g_xx, g_yy, g_zz, indexing='ij')
-    coords_grid = np.array([xx.flatten(), yy.flatten(), zz.flatten()]).T
-    coords_grid = coords_grid.astype(float)
+    # coords_grid = np.array([xx.flatten(), yy.flatten(), zz.flatten()]).T
+    # coords_grid = coords_grid.astype(float)
+    coords_grid = np.concatenate([xx.reshape(
+        1, -1), yy.reshape(1, -1), zz.reshape(1, -1)], axis=0).astype(int).T
     coords_grid = (coords_grid * resolution) + resolution / 2
     # 若 vox_origin 是 PyTorch 张量，转换为 NumPy 数组
     if isinstance(vox_origin, torch.Tensor):
@@ -70,6 +69,72 @@ def get_grid_coords(dims, resolution, vox_origin):
     coords_grid += vox_origin
     return coords_grid
 
+def get_grid_coords_v2(dims, resolution, vox_origin):
+    """
+    :param dims: the dimensions of the grid [x, y, z] (i.e. [256, 256, 32])
+    :return coords_grid: is the center coords of voxels in the grid
+    """
+    g_xx = np.arange(0, dims[0] + 1)
+    g_yy = np.arange(0, dims[1] + 1)
+    g_zz = np.arange(0, dims[2] + 1)
+
+    # Obtaining the grid with coords...
+    xx, yy, zz = np.meshgrid(g_xx[:-1], g_yy[:-1], g_zz[:-1])
+    coords_grid = np.array([xx.flatten(), yy.flatten(), zz.flatten()]).T
+    coords_grid = coords_grid.astype(float)
+    coords_grid = (coords_grid * resolution) + resolution / 2
+
+    temp = np.copy(coords_grid)
+    temp[:, 0] = coords_grid[:, 1]
+    temp[:, 1] = coords_grid[:, 0]
+    coords_grid = np.copy(temp)
+    if isinstance(vox_origin, torch.Tensor):
+        vox_origin = vox_origin.cpu().numpy()
+    coords_grid += vox_origin
+    return coords_grid
+
+
+def remove_voxel_redundancy(points, voxel_size=0.08):
+    """
+    去除体素冗余点，每个体素保留一个点
+
+    参数:
+        points: 形状为(N, 4)的numpy数组，前3列为xyz坐标，第4列为类别
+        voxel_size: 体素大小，默认0.08
+
+    返回:
+        形状为(N_NEW, 4)的numpy数组，每个体素只保留一个点
+    """
+    # 提取坐标信息
+    coords = points[:, :3]
+
+    # 计算每个点对应的体素索引（将连续坐标离散化为体素网格索引）
+    # 这里使用floor除法并取整，将相同体素的点映射到同一索引
+    voxel_indices = (coords / voxel_size).astype(int)
+
+    # 将三维索引转换为字符串键，用于识别相同体素
+    # 例如将(x_idx, y_idx, z_idx)转换为"x,y,z"格式的字符串
+    voxel_keys = [f"{x},{y},{z}" for x, y, z in voxel_indices]
+
+    # 使用字典保存每个体素的第一个出现的点
+    unique_voxels = {}
+    for key, point in zip(voxel_keys, points):
+        if key not in unique_voxels:
+            # 体素不存在时直接添加
+            unique_voxels[key] = point
+        else:
+            # 体素已存在时，检查现有类是否为0或255
+            existing_cls = unique_voxels[key][3]
+            # 如果现有类别不是0也不是255，则跳过当前点（不更新）
+            if existing_cls not in (0, 255):
+                continue
+            # 否则（现有类别是0或255），用当前点更新
+            unique_voxels[key] = point
+
+    # 将字典的值转换为numpy数组，得到去重后的结果
+    result = np.array(list(unique_voxels.values()))
+
+    return result
 
 def merge_voxels_to_world(voxels, target_shape=None, voxel_size=0.08, vox_origins=None, label=False):
     """
@@ -84,58 +149,84 @@ def merge_voxels_to_world(voxels, target_shape=None, voxel_size=0.08, vox_origin
         vox_origins = np.zeros((num_frames, 3))
 
     all_coords = []
-    all_classes = []
 
     for i in range(num_frames):
         frame_voxels = voxels[i]
+
         if not label:
             frame_voxels = torch.softmax(frame_voxels, dim=0).detach().cpu().numpy()
             pred_classes = np.argmax(frame_voxels, axis=0)
         else:
             pred_classes = frame_voxels.detach().cpu().numpy()
 
-        dims = pred_classes.shape
-        coords = get_grid_coords(dims, voxel_size, vox_origins[i])
+        grid_coords = get_grid_coords_v2([pred_classes.shape[0], pred_classes.shape[1], pred_classes.shape[2]],
+                                      voxel_size, vox_origins[i])
+        coords = np.vstack([grid_coords.T, pred_classes.reshape(-1)]).T
+        # print(f'pred_classes.shape: {pred_classes.shape}')
         all_coords.append(coords)
-        all_classes.append(pred_classes.flatten())
 
     all_coords = np.vstack(all_coords)
-    all_classes = np.hstack(all_classes)
-    combined_data = np.hstack([all_coords, all_classes[:, np.newaxis]])
+    print(f'all_coords.shape: {all_coords.shape}')
 
-    min_x, min_y, min_z = np.min(all_coords, axis=0)
-    max_x, max_y, max_z = np.max(all_coords, axis=0)
+    all_coords_filtered = remove_voxel_redundancy(all_coords)
+    print(f'all_coords_filtered.shape: {all_coords_filtered.shape}')
+    # draw_scene_test(all_coords_filtered, voxel_size=0.08, colors=NYU_COLORS)
 
-    if target_shape:
-        new_voxels = np.zeros(target_shape, dtype=np.uint8)
+    return all_coords_filtered
+
+
+def points_to_voxel_grid(points, voxel_size=0.08, target_shape=None):
+    """
+    将去重后的点转换为N×M×H的体素网格
+
+    参数:
+        points: 形状为(N_NEW, 4)的numpy数组，前3列为xyz坐标，第4列为类别
+        voxel_size: 体素大小，默认0.08
+
+    返回:
+        voxel_grid: 形状为(N, M, H)的numpy数组，每个元素表示体素的类别
+        min_coords: 体素网格原点坐标(最小x, 最小y, 最小z)，用于坐标映射
+    """
+    # 提取坐标和类别
+    coords = points[:, :3]
+    classes = points[:, 3].astype(int)
+
+    # 计算坐标的最小值（作为体素网格的原点）
+    min_coords = np.min(coords, axis=0)  # (x_min, y_min, z_min)
+
+    # 计算每个点在体素网格中的索引
+    # 公式：体素索引 = (坐标 - 最小坐标) / 体素大小 → 向下取整
+    voxel_indices = ((coords - min_coords) / voxel_size).astype(int)
+
+    # 处理目标形状
+    if target_shape is not None:
+        # 确保目标形状是三维的
+        assert len(target_shape) == 3, "target_shape必须是三维元组(N, M, H)"
+        # 过滤超出目标形状范围的索引（只保留有效索引的点）
+        valid_mask = (
+                (voxel_indices[:, 0] >= 0) & (voxel_indices[:, 0] < target_shape[0]) &
+                (voxel_indices[:, 1] >= 0) & (voxel_indices[:, 1] < target_shape[1]) &
+                (voxel_indices[:, 2] >= 0) & (voxel_indices[:, 2] < target_shape[2])
+        )
+        # 筛选有效点
+        voxel_indices = voxel_indices[valid_mask]
+        classes = classes[valid_mask]
+        # 使用指定的目标形状
+        grid_dims = target_shape
     else:
-        new_dims = [
-            int(np.ceil((max_x - min_x) / voxel_size)),
-            int(np.ceil((max_y - min_y) / voxel_size)),
-            int(np.ceil((max_z - min_z) / voxel_size))
-        ]
+        # 自动计算网格尺寸
+        grid_dims = np.max(voxel_indices, axis=0) + 1  # (N, M, H)
 
-        new_voxels = np.zeros(new_dims, dtype=np.uint8)
-    voxel_class_counts = {}
+    # 初始化体素网格（用0表示空体素，可根据需要修改）
+    voxel_grid = np.zeros(grid_dims, dtype=int)
 
-    for i in range(combined_data.shape[0]):
-        x_idx = int((combined_data[i, 0] - min_x) / voxel_size)
-        y_idx = int((combined_data[i, 1] - min_y) / voxel_size)
-        z_idx = int((combined_data[i, 2] - min_z) / voxel_size)
+    # 填充体素网格：将每个点的类别写入对应的体素位置
+    for idx, cls in zip(voxel_indices, classes):
+        x, y, z = idx
+        if voxel_grid[x, y, z] in (0, 255):
+            voxel_grid[x, y, z] = cls  # 若有重复索引（理论上不应存在），后出现的会覆盖前一个
 
-        # 检查索引是否在目标形状范围内，若不在则丢弃
-        if 0 <= x_idx < new_voxels.shape[0] and 0 <= y_idx < new_voxels.shape[1] and 0 <= z_idx < new_voxels.shape[2]:
-            if (x_idx, y_idx, z_idx) not in voxel_class_counts:
-                voxel_class_counts[(x_idx, y_idx, z_idx)] = []
-            voxel_class_counts[(x_idx, y_idx, z_idx)].append(combined_data[i, 3])
-
-    for (x_idx, y_idx, z_idx), class_list in voxel_class_counts.items():
-        counter = Counter(class_list)
-        most_common_class = counter.most_common(1)[0][0]
-        new_voxels[x_idx, y_idx, z_idx] = most_common_class
-
-    return new_voxels
-
+    return voxel_grid, min_coords
 
 @hydra.main(config_path='configs', config_name='config', version_base=None)
 def main(cfg: DictConfig):
@@ -205,39 +296,45 @@ def main(cfg: DictConfig):
             batch_size = len(scenes)
             for i in range(batch_size):
                 scene = scenes[i]
+                # voxel_origin = batch_inputs['voxel_origin'][i].detach().cpu().numpy()
+                # cam_pose = batch_inputs['cam_pose'][i].detach().cpu().numpy()
+                # fov_mask = batch_inputs['fov_mask_1'][i].detach().cpu().numpy()
+                # cam_K = batch_inputs['cam_K'][i].detach().cpu().numpy()
                 voxel_origin = batch_inputs['voxel_origin'][i]
                 cam_pose = batch_inputs['cam_pose'][i]
                 fov_mask = batch_inputs['fov_mask_1'][i]
+                cam_K = batch_inputs['cam_K'][i]
 
                 sample_outputs = {
-                    'ssc_logits': outputs['ssc_logits'][i].unsqueeze(0),
+                    'ssc_logits': outputs['ssc_logits'][i],
                     'voxel_origin': voxel_origin,
+                    'cam_K': cam_K,
                     'cam_pose': cam_pose,
                     'fov_mask': fov_mask
                 }
                 # 仅提取 target 作为 sample_targets
                 sample_targets = {
-                    'target': targets['target'][i].unsqueeze(0)
+                    'target': targets['target'][i]
                 }
                 if current_scene is not None and scene != current_scene:
                     # 场景变化，对之前场景的输出进行拼接
                     scene_output = torch.stack([out['ssc_logits'] for out in scene_outputs], dim=0)
                     scene_voxel_origin = torch.stack([out['voxel_origin'] for out in scene_outputs], dim=0)
-                    scene_cam_pose = torch.stack([out['cam_pose'] for out in scene_outputs], dim=0)
-                    scene_fov_mask = torch.stack([out['fov_mask'] for out in scene_outputs], dim=0)
                     scene_target = torch.stack([out['target'] for out in scene_targets], dim=0)
-                    scene_output = torch.squeeze(scene_output, dim=1)
-                    scene_target = torch.squeeze(scene_target, dim=1)
 
                     # print(f"scene_output.shape: {scene_output.shape}")
                     # print(f"scene_target.shape: {scene_target.shape}")
 
-                    scene_target_voxels = merge_voxels_to_world(scene_target, voxel_size=0.08,
+                    scene_target_points = merge_voxels_to_world(scene_target, voxel_size=0.08,
                                                                 vox_origins=scene_voxel_origin, label=True)
-                    # print(f'scene_target_voxels.shape: {scene_target_voxels.shape}')
-                    scene_output_voxels = merge_voxels_to_world(scene_output, target_shape=scene_target_voxels.shape,
+                    scene_target_voxels, min_target_coords = points_to_voxel_grid(scene_target_points)
+                    print(f'scene_target_voxels.shape: {scene_target_voxels.shape}')
+
+                    scene_output_points = merge_voxels_to_world(scene_output, target_shape=scene_target_voxels.shape,
                                                                 voxel_size=0.08, vox_origins=scene_voxel_origin)
-                    # print(f'scene_output_voxels.shape: {scene_output_voxels.shape}')
+                    scene_output_voxels, min_output_coords = points_to_voxel_grid(scene_output_points,
+                                                                                  target_shape=scene_target_voxels.shape)
+                    print(f'scene_output_voxels.shape: {scene_output_voxels.shape}')
 
                     # 转换为 torch.Tensor 并放到指定设备
                     device = sample_outputs['ssc_logits'].device
@@ -249,22 +346,22 @@ def main(cfg: DictConfig):
 
                     pred_np = scene_output_voxels.squeeze(0).detach().cpu().numpy()
                     target_np = scene_target_voxels.squeeze(0).detach().cpu().numpy()
-                    cam_pose_np = scene_cam_pose.detach().cpu().numpy()
-                    vox_origin_np = scene_voxel_origin.detach().cpu().numpy()
-                    fov_mask_np = scene_fov_mask.detach().cpu().numpy()
 
                     print(f'############## visual ##############')
-                    for i, vol in enumerate((pred_np, target_np)):
-                        if vol is None:
-                            continue
-                        print(f'{i} | vol: {vol.shape}')
-                        # draw(vol, cam_pose, vox_origin, fov_mask, **params,
-                        #      save_path=f'./outputs/visual', file_name=f'{id_name}_{i}.png')  #
-                        for j in range(cam_pose_np.shape[0]):
-                            draw_scene(vol, cam_pose_np[j], vox_origin_np[j], fov_mask_np[j], **params)  #
+                    print(f'pred visual')
+                    draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=True)
+                    print(f'target visual')
+                    draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
+
+                    exit()
 
                     scene_outputs = []
                     scene_targets = []
+
+                # preds = torch.softmax(outputs['ssc_logits'][i].unsqueeze(0), dim=1).detach().cpu().numpy()
+                # preds_ori = preds
+                # preds = np.argmax(preds, axis=1).astype(np.uint16)
+                # draw(preds[i], cam_K, cam_pose, voxel_origin, fov_mask, **params)
 
                 scene_outputs.append(sample_outputs)
                 scene_targets.append(sample_targets)

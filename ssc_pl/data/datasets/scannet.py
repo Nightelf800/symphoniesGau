@@ -179,6 +179,13 @@ class ScanNet(Dataset):
         match = re.search(r'scene\d+_\d+', name)
         scene_name = match.group(0) if match else None
 
+        # 找到最后一个 '/' 的位置
+        last_slash_index = name.rfind('/')
+        # 找到 '.pkl' 的位置
+        pkl_index = name.find('.pkl', last_slash_index)
+        # 提取两个位置之间的内容
+        sample_name = name[last_slash_index + 1: pkl_index]
+
         # print(f'name: {name}, scene_name: {scene_name}')
 
         with open(name, 'rb') as f:
@@ -274,6 +281,7 @@ class ScanNet(Dataset):
             # 用于可视化
             'name': name,
             'scene': scene_name,
+            'sample_name': sample_name,
             'cam_intrinsic': data_item['intrinsic'],
         }
 

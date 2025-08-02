@@ -223,6 +223,7 @@ def draw_scene(
             mlab.show()
 
 def draw(
+        data_type,
         voxels,
         cam_pose,
         vox_origin,
@@ -271,7 +272,7 @@ def draw(
     # Get the voxels outside FOV
     outfov_grid_coords = grid_coords[~fov_mask, :]
     # Draw the camera
-    mlab.options.offscreen = True
+    mlab.options.offscreen = False
     try:
         fig = mlab.figure(bgcolor=(1, 1, 1))  # 使用指定的场景
         print("图形窗口创建成功")
@@ -309,54 +310,46 @@ def draw(
     plt_plot.scene.camera.zoom(1.0)
     # 调整相机视角（可选，如果你想通过代码设置视角）
 
-    # if need_update_view:
-    #     def update_view():
-    #         azimuth = 160
-    #         elevation = -30
-    #         roll = 90
-    #         while True:
-    #             time.sleep(3)  # 每 2 秒更新一次视角
-    #             azimuth += 10  # 每次增加 10 度
-    #             # elevation += 20
-    #             # roll += 10
-    # 
-    #             mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=7)
-    #             print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')
-    #             mlab.gcf().scene.render()  # 强制重绘场景
-    # 
-    #     # 启动一个线程来更新视角
-    #     update_thread = Thread(target=update_view)
-    #     update_thread.daemon = True
-    #     update_thread.start()
-    #     # 显示场景
-    #     mlab.show()
-    # else:
-    #     mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
-    # 
-    #     if save_path:
-    #         if not os.path.exists(save_path):
-    #         # 如果不存在，创建路径
-    #             os.makedirs(save_path)
-    #         save = os.path.join(save_path, file_name)
-    #         print(f'save: {save}')
-    #         mlab.savefig(save, size=(1920, 1080))
-    #         print(f'save: {save}')
-    #         mlab.close()
-    #     else:
-    #         mlab.show()
+    if need_update_view:
+        def update_view():
+            azimuth = 0
+            elevation = 0
+            roll = 0
+            while True:
+                time.sleep(3)  # 每 2 秒更新一次视角
+                azimuth += 10  # 每次增加 10 度
+                # elevation += 20
+                # roll += 10
 
-    mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
+                mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=3)
+                print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')
+                mlab.gcf().scene.render()  # 强制重绘场景
 
-    if save_path:
-        if not os.path.exists(save_path):
-            # 如果不存在，创建路径
-            os.makedirs(save_path)
-        save = os.path.join(save_path, file_name)
-        print(f'save: {save}')
-        mlab.savefig(save, size=(1920, 1080))
-        mlab.close()
-    else:
+
+        # 启动一个线程来更新视角
+        update_thread = Thread(target=update_view)
+        update_thread.daemon = True
+        update_thread.start()
+        # 显示场景
         mlab.show()
+    else:
+        if data_type == 'SYNData':
+            mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
+        elif data_type == 'ScanNet':
+            mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
+
+        if save_path:
+            if not os.path.exists(save_path):
+                # 如果不存在，创建路径
+                os.makedirs(save_path)
+            save = os.path.join(save_path, file_name)
+            print(f'save: {save}')
+            mlab.savefig(save, size=(1920, 1080))
+            mlab.close()
+        else:
+            mlab.show()
+
+
 
 
 def log_metrics(evaluator, prefix=None):
@@ -409,7 +402,8 @@ def main(config: DictConfig):
         # print('output[pred].shape: {}'.format(outputs['pred'].shape))
         # print('output[target].shape: {}'.format(outputs['target'].shape))
 
-        if config.data.datasets.type == 'SemanticKITTI':
+        data_type = config.data.datasets.type
+        if data_type == 'SemanticKITTI':
             params = dict(
                 img_size=(1220, 370),
                 f=707.0912,
@@ -417,7 +411,7 @@ def main(config: DictConfig):
                 d=7,
                 colors=COLORS,
             )
-        elif config.data.datasets.type == 'KITTI360':
+        elif data_type == 'KITTI360':
             # Otherwise the trained model would output distorted results, due to unreasonably labeling
             # a large number of voxels as "ignored" in the annotations.
             pred[target == 255] = 0
@@ -428,7 +422,7 @@ def main(config: DictConfig):
                 d=7,
                 colors=KITTI360_COLORS,
             )
-        elif config.data.datasets.type == 'NYUv2':
+        elif data_type == 'NYUv2':
             pred[target == 255] = 0
             params = dict(
                 img_size=(640, 480),
@@ -437,7 +431,7 @@ def main(config: DictConfig):
                 d=0.75,
                 colors=NYU_COLORS,
             )
-        elif config.data.datasets.type == 'SYNData':
+        elif data_type == 'SYNData':
             pred[target == 255] = 0
             params = dict(
                 img_size=(640, 480),
@@ -446,19 +440,28 @@ def main(config: DictConfig):
                 d=0.5,
                 colors=NYU_COLORS,
             )
+        elif data_type == 'ScanNet':
+            pred[target == 255] = 0
+            params = dict(
+                img_size=(640, 480),
+                f=116.9621,
+                voxel_size=0.08,
+                d=0.3,
+                colors=NYU_COLORS,
+            )
         else:
             raise NotImplementedError
 
         print(f'config.data.datasets.type: {config.data.datasets.type}')
-
+        print(f'vox_origin: {vox_origin}')
         file_name = file.split(os.sep)[-1].split(".")[0]
         for i, vol in enumerate((pred, target)):
             if vol is None:
                 continue
             # print(f'{i} | vol: {vol.shape}')
-            draw(vol, cam_pose, vox_origin, fov_mask, **params,
-                 save_path=f'./outputs/visual', file_name=f'{id_name}_{i}.png')
-            # draw(vol, cam_pose, vox_origin, fov_mask, **params)
+            # draw(vol, cam_pose, vox_origin, fov_mask, **params,
+            #      save_path=f'./outputs/visual', file_name=f'{id_name}_{i}.png')
+            draw(data_type, vol, cam_pose, vox_origin, fov_mask, **params, need_update_view=False)
 
 
 if __name__ == '__main__':

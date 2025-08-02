@@ -12,14 +12,15 @@ from rich.progress import track
 from ssc_pl import LitModule, build_data_loaders, pre_build_callbacks, build_from_configs
 
 
-@hydra.main(config_path='configs', config_name='config', version_base=None)
+@hydra.main(config_path='../configs', config_name='config', version_base=None)
 def main(cfg: DictConfig):
     cfg, _ = pre_build_callbacks(cfg)
 
     dls, meta_info = build_data_loaders(cfg.data)
     data_loader = dls[1]
     # output_dir = osp.join('outputs', cfg.data.datasets.type)
-    output_dir = osp.join('outputs', 'syndata')
+    output_dir = osp.join('outputs', 'scannet_pkl')
+    os.makedirs(output_dir, exist_ok=True)
 
     if cfg.get('ckpt_path'):
         model = LitModule.load_from_checkpoint(cfg.ckpt_path, **cfg, meta_info=meta_info)
@@ -45,9 +46,12 @@ def main(cfg: DictConfig):
             fps = 1 / step_time  # 计算FPS
             total_time += step_time
 
+            # print(f"ssc_logits.1.shape: {outputs['ssc_logits'].shape}")
             preds = torch.softmax(outputs['ssc_logits'], dim=1).detach().cpu().numpy()
+            # print(f'preds.1.shape: {preds.shape}')
             preds_ori = preds
             preds = np.argmax(preds, axis=1).astype(np.uint16)
+            # print(f'preds.2.shape: {preds.shape}')
 
             # print(f"FPS: {fps:.2f}")
 
@@ -59,6 +63,10 @@ def main(cfg: DictConfig):
 
                 if cfg.data.datasets.type == 'NYUv2':
                     file_path = osp.join(output_dir, batch_inputs['name'][i] + '.pkl')
+                elif cfg.data.datasets.type == 'ScanNet':
+                    output_scene_dir = os.path.join(output_dir, batch_inputs['scene'][i])
+                    os.makedirs(output_scene_dir, exist_ok=True)
+                    file_path = osp.join(output_scene_dir,  batch_inputs['sample_name'][i] + '.pkl')
                 elif cfg.data.datasets.type == 'SYNData':
                     file_path = osp.join(output_dir, batch_inputs['filename'][i] + '.pkl')
                 else:
@@ -72,7 +80,6 @@ def main(cfg: DictConfig):
                 for key in keys_of_interest:
                     output_dict[key] = outputs[key].detach().cpu().numpy()
 
-                os.makedirs(output_dir, exist_ok=True)
                 with open(file_path, 'wb') as f:
                     pickle.dump(output_dict, f)
                     # print('saved to', file_path)
