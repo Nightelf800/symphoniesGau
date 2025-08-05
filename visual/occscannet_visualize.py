@@ -217,20 +217,20 @@ def draw_scene(
     # 调整相机视角（可选，如果你想通过代码设置视角）
 
 
-    # mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
+    # mlab.view(azimuth=0, elevation=0, roll=0, distance=13)
 
     if need_update_view:
         def update_view():
-            azimuth = 0
-            elevation = 0
+            azimuth = 280
+            elevation = 60
             roll = 0
             while True:
-                time.sleep(5)  # 每 2 秒更新一次视角
-                azimuth += 10  # 每次增加 10 度
-                # elevation += 20
+                time.sleep(2)  # 每 2 秒更新一次视角
+                # azimuth += 20  # 每次增加 10 度
+                elevation += 20
                 # roll += 10
 
-                mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=5)
+                mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=20)
                 print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')
                 mlab.gcf().scene.render()  # 强制重绘场景
 
@@ -340,7 +340,7 @@ def draw(
     for i, name in enumerate(COLORS_MAPS):
         color = tuple(NYU_COLORS[i][:3] / 255.0)
         mlab.text(0.9, 0.4 * (1 - (i + 0.5) / len(COLORS_MAPS)), name, color=color, width=len(name)*0.02)
-    # plt_plot.scene.camera.zoom(1.0)
+    plt_plot.scene.camera.zoom(1.0)
     # 调整相机视角（可选，如果你想通过代码设置视角）
 
     if need_update_view:
@@ -351,8 +351,8 @@ def draw(
             while True:
                 time.sleep(3)  # 每 2 秒更新一次视角
                 azimuth += 10  # 每次增加 10 度
-                # elevation += 20
-                # roll += 10
+                elevation += 20
+                roll += 10
 
                 mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=3)
                 print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')

@@ -166,10 +166,10 @@ def merge_voxels_to_world(voxels, target_shape=None, voxel_size=0.08, vox_origin
         all_coords.append(coords)
 
     all_coords = np.vstack(all_coords)
-    print(f'all_coords.shape: {all_coords.shape}')
+    # print(f'all_coords.shape: {all_coords.shape}')
 
     all_coords_filtered = remove_voxel_redundancy(all_coords)
-    print(f'all_coords_filtered.shape: {all_coords_filtered.shape}')
+    # print(f'all_coords_filtered.shape: {all_coords_filtered.shape}')
     # draw_scene_test(all_coords_filtered, voxel_size=0.08, colors=NYU_COLORS)
 
     return all_coords_filtered
@@ -328,13 +328,13 @@ def main(cfg: DictConfig):
                     scene_target_points = merge_voxels_to_world(scene_target, voxel_size=0.08,
                                                                 vox_origins=scene_voxel_origin, label=True)
                     scene_target_voxels, min_target_coords = points_to_voxel_grid(scene_target_points)
-                    print(f'scene_target_voxels.shape: {scene_target_voxels.shape}')
+                    # print(f'scene_target_voxels.shape: {scene_target_voxels.shape}')
 
                     scene_output_points = merge_voxels_to_world(scene_output, target_shape=scene_target_voxels.shape,
                                                                 voxel_size=0.08, vox_origins=scene_voxel_origin)
                     scene_output_voxels, min_output_coords = points_to_voxel_grid(scene_output_points,
                                                                                   target_shape=scene_target_voxels.shape)
-                    print(f'scene_output_voxels.shape: {scene_output_voxels.shape}')
+                    # print(f'scene_output_voxels.shape: {scene_output_voxels.shape}')
 
                     # 转换为 torch.Tensor 并放到指定设备
                     device = sample_outputs['ssc_logits'].device
@@ -347,13 +347,11 @@ def main(cfg: DictConfig):
                     pred_np = scene_output_voxels.squeeze(0).detach().cpu().numpy()
                     target_np = scene_target_voxels.squeeze(0).detach().cpu().numpy()
 
-                    print(f'############## visual ##############')
-                    print(f'pred visual')
-                    draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=True)
-                    print(f'target visual')
-                    draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
-
-                    exit()
+                    # print(f'############## visual ##############')
+                    # print(f'pred visual')
+                    # draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=False)
+                    # print(f'target visual')
+                    # draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
 
                     scene_outputs = []
                     scene_targets = []
@@ -380,17 +378,19 @@ def main(cfg: DictConfig):
             scene_output = torch.stack([out['ssc_logits'] for out in scene_outputs], dim=0)
             scene_voxel_origin = torch.stack([out['voxel_origin'] for out in scene_outputs], dim=0)
             scene_target = torch.stack([out['target'] for out in scene_targets], dim=0)
-            scene_output = torch.squeeze(scene_output, dim=1)
-            scene_target = torch.squeeze(scene_target, dim=1)
 
-            print(f"scene_output.shape: {scene_output.shape}")
-            print(f"scene_target.shape: {scene_target.shape}")
+            # print(f"scene_output.shape: {scene_output.shape}")
+            # print(f"scene_target.shape: {scene_target.shape}")
 
-            scene_target_voxels = merge_voxels_to_world(scene_target, voxel_size=0.08, vox_origins=scene_voxel_origin,
-                                                        label=True)
+            scene_target_points = merge_voxels_to_world(scene_target, voxel_size=0.08,
+                                                        vox_origins=scene_voxel_origin, label=True)
+            scene_target_voxels, min_target_coords = points_to_voxel_grid(scene_target_points)
             print(f'scene_target_voxels.shape: {scene_target_voxels.shape}')
-            scene_output_voxels = merge_voxels_to_world(scene_output, target_shape=scene_target_voxels.shape,
+
+            scene_output_points = merge_voxels_to_world(scene_output, target_shape=scene_target_voxels.shape,
                                                         voxel_size=0.08, vox_origins=scene_voxel_origin)
+            scene_output_voxels, min_output_coords = points_to_voxel_grid(scene_output_points,
+                                                                          target_shape=scene_target_voxels.shape)
             print(f'scene_output_voxels.shape: {scene_output_voxels.shape}')
 
             # 转换为 torch.Tensor 并放到指定设备
@@ -398,7 +398,17 @@ def main(cfg: DictConfig):
             scene_output_voxels = torch.tensor(scene_output_voxels, device=device).unsqueeze(0)
             scene_target_voxels = torch.tensor(scene_target_voxels, device=device).unsqueeze(0)
             if test_scene_evaluator:
-                test_scene_evaluator.update({'ssc_logits': scene_output_voxels}, {'target': scene_target_voxels})
+                test_scene_evaluator.update({'ssc_logits': scene_output_voxels},
+                                            {'target': scene_target_voxels})
+
+            pred_np = scene_output_voxels.squeeze(0).detach().cpu().numpy()
+            target_np = scene_target_voxels.squeeze(0).detach().cpu().numpy()
+
+            # print(f'############## visual ##############')
+            # print(f'pred visual')
+            # draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=False)
+            # print(f'target visual')
+            # draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
 
         log_metrics(test_evaluator, 'val')
         log_metrics(test_scene_evaluator, 'val', scene=True)
