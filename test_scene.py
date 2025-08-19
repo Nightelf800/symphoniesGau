@@ -404,11 +404,11 @@ def main(cfg: DictConfig):
             pred_np = scene_output_voxels.squeeze(0).detach().cpu().numpy()
             target_np = scene_target_voxels.squeeze(0).detach().cpu().numpy()
 
-            # print(f'############## visual ##############')
-            # print(f'pred visual')
-            # draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=False)
-            # print(f'target visual')
-            # draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
+            print(f'############## visual ##############')
+            print(f'pred visual')
+            draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=False)
+            print(f'target visual')
+            draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
 
         log_metrics(test_evaluator, 'val')
         log_metrics(test_scene_evaluator, 'val', scene=True)

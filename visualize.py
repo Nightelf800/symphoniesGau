@@ -278,8 +278,8 @@ def draw(
         print("图形窗口创建成功")
     except Exception as e:
         print(f"创建图形窗口时出错: {e}")
-    mlab.triangular_mesh(
-        x, y, z, triangles, representation='wireframe', color=(0, 0, 0), line_width=5)
+    # mlab.triangular_mesh(
+    #     x, y, z, triangles, representation='wireframe', color=(0, 0, 0), line_width=5)
 
     outfov_colors = colors.copy()
     outfov_colors[:, :3] = outfov_colors[:, :3] // 3 * 2
@@ -333,10 +333,10 @@ def draw(
         # 显示场景
         mlab.show()
     else:
-        if data_type == 'SYNData':
-            mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
-        elif data_type == 'ScanNet':
-            mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
+        # if data_type == 'SYNData':
+        #     mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
+        # elif data_type == 'ScanNet':
+        #     mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
 
         if save_path:
             if not os.path.exists(save_path):
@@ -456,7 +456,7 @@ def main(config: DictConfig):
         print(f'config.data.datasets.type: {config.data.datasets.type}')
         print(f'vox_origin: {vox_origin}')
         file_name = file.split(os.sep)[-1].split(".")[0]
-        for i, vol in enumerate((pred, target)):
+        for i, vol in enumerate((target, pred)):
             if vol is None:
                 continue
             # print(f'{i} | vol: {vol.shape}')
@@ -467,3 +467,4 @@ def main(config: DictConfig):
 
 if __name__ == '__main__':
     main()
+

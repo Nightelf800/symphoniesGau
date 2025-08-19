@@ -33,11 +33,11 @@ class SYNData(Dataset):
     def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
                  use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = osp.join(data_root, split, 'color')
-        self.label_root = osp.join(label_root, split, 'output_occ')
-        self.depth_root = osp.join(depth_root, split, 'depth')
+        self.label_root = osp.join(label_root, split, 'cleaned_preprocess_voxels')
+        self.depth_root = osp.join(depth_root, split, 'depth_from_camera')
         self.depth_eval = depth_eval
         self.frustum_size = frustum_size
-        self.num_classes = 12
+        self.num_classes = 13
         self.use_tsdf = use_tsdf
         # self.ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
         # self.meta_info = {}
@@ -59,7 +59,7 @@ class SYNData(Dataset):
         self.pc_range = np.array(pc_range, dtype=np.float64)
         self.img_shape =  (640, 480)
 
-        self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
+        self.scan_names = glob.glob(osp.join(self.label_root, '*.pkl'))
         self.transforms = T.Compose([
             T.ToTensor(),
             T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
