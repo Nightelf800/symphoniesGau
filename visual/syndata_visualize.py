@@ -333,10 +333,10 @@ def draw(
         # 显示场景
         mlab.show()
     else:
-        if data_type == 'SYNData':
-            mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
-        elif data_type == 'ScanNet':
-            mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
+        # if data_type == 'SYNData':
+        #     mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
+        # elif data_type == 'ScanNet':
+        #     mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
 
         if save_path:
             if not os.path.exists(save_path):

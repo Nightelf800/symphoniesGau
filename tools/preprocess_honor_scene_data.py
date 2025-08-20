@@ -4,9 +4,9 @@ import shutil
 
 def process_honor_files():
     # 源目录和目标目录设置
-    source_root = './data/honor_coll_data'
-    target_train_root = './data/honor_coll_data/train'
-    target_test_root = './data/honor_coll_data/test'
+    source_root = './data/honor_collection_data'
+    target_train_root = './data/honor_collection_data/train'
+    target_test_root = './data/honor_collection_data/test'
     
     # 确保目标目录存在
     os.makedirs(target_train_root, exist_ok=True)
@@ -18,6 +18,8 @@ def process_honor_files():
         
         # 只处理目录
         if not os.path.isdir(folder_path):
+            continue
+        if folder_name == 'train' or folder_name == 'test':
             continue
             
         # 创建对应的train和test子目录

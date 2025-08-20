@@ -125,7 +125,7 @@ class SYNData(Dataset):
             target_1_4 = data_occ['target_1_4']
 
             # 把 >=12 并且 <255 的值都变成 0
-            target_1_4[(target_1_4 >= 12) & (target_1_4 < 255)] = 0
+            # target_1_4[(target_1_4 >= 12) & (target_1_4 < 255)] = 0
             
             # 获取target_1_4的唯一值
             # unique_values = np.unique(target_1_4)

@@ -4,10 +4,10 @@ data:
   datasets:
     type: SYNData
     splits: [train, test]  # replace with kv pairs if specified configs is in need
-    data_root: ./data/honor_coll_data
+    data_root: ./data/honor_collection_data
     # depth_root: /data2/ylc/codes/Depth-Anything/metric_depth/nyu_no_restraint_depth_visualize
-    depth_root: ./data/honor_coll_data
-    label_root: ./data/honor_coll_data
+    depth_root: ./data/honor_collection_data
+    label_root: ./data/honor_collection_data
     depth_eval: false
     use_crop: true
     voxel_size: 0.08

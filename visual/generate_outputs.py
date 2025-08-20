@@ -19,7 +19,7 @@ def main(cfg: DictConfig):
     dls, meta_info = build_data_loaders(cfg.data)
     data_loader = dls[1]
     # output_dir = osp.join('outputs', cfg.data.datasets.type)
-    output_dir = osp.join('outputs', 'scannet_pkl')
+    output_dir = osp.join('outputs', 'honor_pkl')
     os.makedirs(output_dir, exist_ok=True)
 
     if cfg.get('ckpt_path'):
