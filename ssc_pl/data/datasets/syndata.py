@@ -33,7 +33,7 @@ class SYNData(Dataset):
     def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
                  use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = osp.join(data_root, split, 'color')
-        self.label_root = osp.join(label_root, split, 'cleaned_preprocess_voxels')
+        self.label_root = osp.join(label_root, split, 'cleaned_preprocess_voxels_sam')
         self.depth_root = osp.join(depth_root, split, 'depth_from_camera')
         self.depth_eval = depth_eval
         self.frustum_size = frustum_size
@@ -57,7 +57,7 @@ class SYNData(Dataset):
         self.scene_size = (4.8, 4.8, 2.88)  # meters
         # self.scene_size = (4, 4, 2)  # meters
         self.pc_range = np.array(pc_range, dtype=np.float64)
-        self.img_shape =  (640, 480)
+        self.img_shape = (640, 480)
 
         self.scan_names = glob.glob(osp.join(self.label_root, '*.pkl'))
         self.transforms = T.Compose([
@@ -86,7 +86,7 @@ class SYNData(Dataset):
         filename = osp.basename(self.scan_names[idx])[:-4]
         # filename = 'NYU0001_0000'
         # print(f'filename: {filename}')
-
+        scene_name = "1"
 
         filepath = osp.join(self.label_root, filename + '.pkl')
         # print(f'filepath: {filepath}')
@@ -112,6 +112,7 @@ class SYNData(Dataset):
         label = {}
         data = {}
         data['filename'] = filename
+        data['scene'] = scene_name
         cam_pose = np.linalg.inv(data_occ['cam_pose'])
         data['cam_pose'] = cam_pose
         voxel_origin = data_occ['voxel_origin']

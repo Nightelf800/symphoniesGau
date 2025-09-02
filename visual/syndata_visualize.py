@@ -349,7 +349,122 @@ def draw(
         else:
             mlab.show()
 
+def draw_gt(
+        voxels,
+        cam_pose,
+        vox_origin,
+        img_size,
+        f,
+        voxel_size=0.08,
+        d=7,  # 7m - determine the size of the mesh representing the camera
+        colors=None,
+        save_path=None,
+        file_name=None,
+        need_update_view=False,
+):
+    # Compute the coordinates of the mesh representing camera
+    x = d * img_size[0] / (2 * f)
+    y = d * img_size[1] / (2 * f)
+    tri_points = np.array([
+        [0, 0, 0],
+        [x, y, d],
+        [-x, y, d],
+        [-x, -y, d],
+        [x, -y, d],
+    ])
+    tri_points = np.hstack([tri_points, np.ones((5, 1))])
+    tri_points = (np.linalg.inv(cam_pose) @ tri_points.T).T
+    x = tri_points[:, 0] - vox_origin[0]
+    y = tri_points[:, 1] - vox_origin[1]
+    z = tri_points[:, 2] - vox_origin[2]
+    triangles = [
+        (0, 1, 2),
+        (0, 1, 4),
+        (0, 3, 4),
+        (0, 2, 3),
+    ]
 
+    # Compute the voxels coordinates
+    print(f'voxel_size: {voxel_size}')
+    grid_coords = get_grid_coords([voxels.shape[0], voxels.shape[1], voxels.shape[2]], voxel_size)
+    # print(f'grid_coords.shape: {grid_coords.shape}')
+    # Attach the predicted class to every voxel
+    # print(f'voxels.reshape(-1).shape: {voxels.reshape(-1).shape}')
+    grid_coords = np.vstack([grid_coords.T, voxels.reshape(-1)]).T
+
+    # Draw the camera
+    mlab.options.offscreen = True if save_path else False
+    try:
+        fig = mlab.figure(bgcolor=(1, 1, 1))  # 使用指定的场景
+        print("图形窗口创建成功")
+    except Exception as e:
+        print(f"创建图形窗口时出错: {e}")
+    mlab.triangular_mesh(
+        x, y, z, triangles, representation='wireframe', color=(0, 0, 0), line_width=5)
+
+    outfov_colors = colors.copy()
+    outfov_colors[:, :3] = outfov_colors[:, :3] // 3 * 2
+
+    voxels = grid_coords[(grid_coords[:, 3] > 0) & (grid_coords[:, 3] < 255)]
+
+    plt_plot = mlab.points3d(
+        voxels[:, 0],
+        voxels[:, 1],
+        voxels[:, 2],
+        voxels[:, 3],
+        colormap='viridis',
+        scale_factor=voxel_size - 0.05 * voxel_size,
+        mode='cube',
+        opacity=1.0,
+        vmin=0,
+        vmax=12)
+
+    plt_plot.glyph.scale_mode = 'scale_by_vector'
+    plt_plot.module_manager.scalar_lut_manager.lut.table = colors
+    # print(f'save: {save}')
+    # 在颜色条旁边列出对应的物体名称
+    for i, name in enumerate(COLORS_MAPS):
+        color = tuple(NYU_COLORS[i][:3] / 255.0)
+        mlab.text(0.9, 0.4 * (1 - (i + 0.5) / len(COLORS_MAPS)), name, color=color, width=len(name)*0.02)
+    plt_plot.scene.camera.zoom(1.0)
+    # 调整相机视角（可选，如果你想通过代码设置视角）
+
+    if need_update_view:
+        def update_view():
+            azimuth = 0
+            elevation = 0
+            roll = 0
+            while True:
+                time.sleep(3)  # 每 2 秒更新一次视角
+                azimuth += 10  # 每次增加 10 度
+                # elevation += 20
+                # roll += 10
+
+                mlab.view(azimuth=azimuth, elevation=60, distance=7)
+                print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')
+                mlab.gcf().scene.render()  # 强制重绘场景
+
+
+        # 启动一个线程来更新视角
+        update_thread = Thread(target=update_view)
+        update_thread.daemon = True
+        update_thread.start()
+        # 显示场景
+        mlab.show()
+    else:
+        mlab.view(azimuth=-90, elevation=60, distance=7)
+
+        if save_path:
+            if not os.path.exists(save_path):
+                # 如果不存在，创建路径
+                os.makedirs(save_path)
+            save = os.path.join(save_path, file_name)
+            print(f'save: {save}')
+            mlab.savefig(save)
+            # mlab.savefig(save, size=(1920, 1080))
+            mlab.close()
+        else:
+            mlab.show()
 
 
 def log_metrics(evaluator, prefix=None):

@@ -12,7 +12,7 @@ from rich.progress import track
 from ssc_pl import LitModule, build_data_loaders, pre_build_callbacks, build_from_configs
 
 
-@hydra.main(config_path='../configs', config_name='config', version_base=None)
+@hydra.main(config_path='./configs', config_name='config', version_base=None)
 def main(cfg: DictConfig):
     cfg, _ = pre_build_callbacks(cfg)
 

@@ -4,10 +4,10 @@ data:
   datasets:
     type: SYNData
     splits: [train, test]  # replace with kv pairs if specified configs is in need
-    data_root: ./data/syndata
+    data_root: ./data/honor_coll_data/honor_sam_0901
     # depth_root: /data2/ylc/codes/Depth-Anything/metric_depth/nyu_no_restraint_depth_visualize
-    depth_root: ./data/syndata
-    label_root: ./data/syndata
+    depth_root: ./data/honor_coll_data/honor_sam_0901
+    label_root: ./data/honor_coll_data/honor_sam_0901
     depth_eval: false
     use_crop: true
     voxel_size: 0.08
@@ -21,11 +21,15 @@ model:
   channels: 200
   scene_size: [60, 60, 36]
   volume_scale: 1
-  num_classes: 12
+  num_classes: 13
   image_shape: [480, 640]
   voxel_size: 0.08
   downsample_z: 1
 
-evaluator:
+evaluator1:
   type: SSCMetrics
-  num_classes: 12
+  num_classes: 13
+
+evaluator2:
+  type: SSCMetrics
+  num_classes: 13
