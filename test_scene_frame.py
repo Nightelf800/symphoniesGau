@@ -301,21 +301,18 @@ def main(cfg: DictConfig):
     total_time = 0.0
 
     current_scene = None
+    update_frame = False
     
     # 添加变量来保存上一帧的数据
     prev_occ_output = None  # 上一帧的occ输出
     prev_voxel_origin = None  # 上一帧的voxel_origin
 
-    params = dict(
-        img_size=(640, 480),
-        f=480,
-        voxel_size=0.08,
-        d=0.5,
-        colors=NYU_COLORS,
-    )
-
+    render_num = 100
+    render_idx = 0
     with torch.no_grad():
         for batch_inputs, targets in track(data_loader):
+            if render_idx >= render_num:
+                break
             # print(batch_inputs.keys())
             # print('batch_inputs.name: {}'.format(batch_inputs['name']))
             scenes = batch_inputs['scene']  # 假设 'name' 标识场景
@@ -364,7 +361,8 @@ def main(cfg: DictConfig):
                 current_mask_3d = fov_mask.reshape(60, 60, 36)
                 
                 # 如果有上一帧数据，执行融合操作
-                if prev_occ_output is not None and prev_voxel_origin is not None and scene == current_scene:
+                if update_frame and prev_occ_output is not None and \
+                        prev_voxel_origin is not None and scene == current_scene:
                     # 转换上一帧的occ输出到当前帧的坐标系
                     transformed_prev_occ = transform_voxel_grid_to_new_origin(
                         prev_occ_output, prev_voxel_origin, voxel_origin
@@ -412,26 +410,27 @@ def main(cfg: DictConfig):
                 prev_voxel_origin = voxel_origin
                 target_np = targets['target'][i].detach().cpu().numpy()
                 
-                if test_scene_evaluator:
-                    test_scene_evaluator.update({'ssc_logits': torch.softmax(outputs['ssc_logits'][i], dim=0).argmax(dim=0).unsqueeze(0)},
-                                                    {'target': targets['target'][i].unsqueeze(0)})
+                # if test_scene_evaluator:
+                #     test_scene_evaluator.update({'ssc_logits': torch.softmax(outputs['ssc_logits'][i], dim=0).argmax(dim=0).unsqueeze(0)},
+                #                                     {'target': targets['target'][i].unsqueeze(0)})
 
 
                 print(f'############## visual ##############')
                 print(f'pred visual')
                 print(f'file: {filename}')
                 draw('SYNData', prev_occ_output, cam_pose, prev_voxel_origin, fov_mask,
-                     (640, 480), cam_K[0, 0], need_update_view=False)
-                # draw_scene(pred_np, min_output_coords, voxel_size=0.08, colors=NYU_COLORS, need_update_view=False)
+                     (640, 480), cam_K[0, 0], save_path='./outputs/visual/0915/pred/', file_name=f'{filename}.png',
+                     need_update_view=False)
                 print(f'target visual')
                 draw('SYNData', target_np, cam_pose, prev_voxel_origin, fov_mask,
-                     (640, 480), cam_K[0, 0], need_update_view=False)
-                # draw_scene(target_np, min_target_coords, voxel_size=0.08, colors=NYU_COLORS)
+                     (640, 480), cam_K[0, 0], save_path='./outputs/visual/0915/gt/', file_name=f'{filename}.png',
+                     need_update_view=False)
 
             current_scene = scene
 
             fps = 1 / step_time  # 计算FPS
             total_time += step_time
+            render_idx += 1
 
             # preds = torch.softmax(outputs['ssc_logits'], dim=1).detach().cpu().numpy()
             # preds = np.argmax(preds, axis=1).astype(np.uint16)

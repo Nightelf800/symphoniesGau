@@ -61,6 +61,7 @@ NYU_COLORS = np.array(
         [255, 127, 12, 255],  # 10 furn     橙色
         [196, 175, 214, 255],  # 11 objs       淡紫色
         [153, 153, 153, 255],  # 12     灰色
+        [219, 68, 55, 255],  # 12 people    深粉色
     ]
 )
 
@@ -272,7 +273,7 @@ def draw(
     # Get the voxels outside FOV
     outfov_grid_coords = grid_coords[~fov_mask, :]
     # Draw the camera
-    mlab.options.offscreen = False
+    mlab.options.offscreen = True if save_path else False
     try:
         fig = mlab.figure(bgcolor=(1, 1, 1))  # 使用指定的场景
         print("图形窗口创建成功")
@@ -333,18 +334,13 @@ def draw(
         # 显示场景
         mlab.show()
     else:
-        # if data_type == 'SYNData':
-        #     mlab.view(azimuth=190, elevation=-30, roll=90, distance=7)
-        # elif data_type == 'ScanNet':
-        #     mlab.view(azimuth=0, elevation=0, roll=0, distance=3,)
+        mlab.view(azimuth=-145, elevation=70, distance=7)
 
         if save_path:
-            if not os.path.exists(save_path):
-                # 如果不存在，创建路径
-                os.makedirs(save_path)
+            os.makedirs(save_path, exist_ok=True)
             save = os.path.join(save_path, file_name)
             print(f'save: {save}')
-            mlab.savefig(save, size=(1920, 1080))
+            mlab.savefig(save)
             mlab.close()
         else:
             mlab.show()

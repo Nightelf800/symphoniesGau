@@ -72,7 +72,7 @@ def main(cfg: DictConfig):
             # preds = torch.softmax(outputs['ssc_logits'], dim=1).detach().cpu().numpy()
             # preds = np.argmax(preds, axis=1).astype(np.uint16)
 
-            print(f"FPS: {fps:.2f}")
+            # print(f"FPS: {fps:.2f}")
 
         log_metrics(test_evaluator, 'val')
 
