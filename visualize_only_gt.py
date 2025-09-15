@@ -1,18 +1,7 @@
 import os
 import pickle
-import time
-
-import hydra
 import numpy as np
-import torch
-from omegaconf import DictConfig
-from rich.progress import track
-from mayavi import mlab
-from threading import Thread
-
-from scipy.ndimage import zoom
 from visual.syndata_visualize import draw_gt
-from ssc_pl import LitModule, build_data_loaders, pre_build_callbacks, build_from_configs, evaluation
 from ssc_pl.utils.helper import vox2pix
 
 from xvfbwrapper import Xvfb
@@ -117,6 +106,7 @@ def main():
         vox_origin = outputs['voxel_origin']
         cam_K = outputs['intrinsic']
         target = outputs['target_1_4']
+        target = np.swapaxes(target, 0, 1)
 
         params = dict(
             img_size=(640, 480),
@@ -128,9 +118,9 @@ def main():
 
         # print(f'config.data.datasets.type: {config.data.datasets.type}')
         # print(f'vox_origin: {vox_origin}')
-        draw_gt(target, cam_pose, vox_origin, **params,
-             save_path=f'./outputs/visual_honor_gt', file_name=f'{id_name}.png')
-        # draw_gt(target, cam_pose, vox_origin, **params, need_update_view=False)
+        # draw_gt(target, cam_pose, vox_origin, **params,
+        #      save_path=f'./outputs/visual_honor_gt', file_name=f'{id_name}.png')
+        draw_gt(target, cam_pose, vox_origin, **params, need_update_view=False)
 
 
 if __name__ == '__main__':

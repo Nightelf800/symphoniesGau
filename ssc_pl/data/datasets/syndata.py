@@ -27,14 +27,14 @@ class SYNData(Dataset):
         'class_weights':
         torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
         'class_names': ('empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa',
-                        'table', 'tvs', 'furn', 'objs'),
+                        'table', 'tvs', 'furn', 'objs', 'people'),
     }
 
     def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
                  use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = osp.join(data_root, split, 'color')
-        self.label_root = osp.join(label_root, split, 'cleaned_preprocess_voxels_sam')
-        self.depth_root = osp.join(depth_root, split, 'depth_from_camera')
+        self.label_root = osp.join(label_root, split, 'voxels')
+        self.depth_root = osp.join(depth_root, split, 'depth')
         self.depth_eval = depth_eval
         self.frustum_size = frustum_size
         self.num_classes = 13
@@ -60,10 +60,15 @@ class SYNData(Dataset):
         self.img_shape = (640, 480)
 
         self.scan_names = glob.glob(osp.join(self.label_root, '*.pkl'))
+        if split == 'test':
+            self.scan_names = sorted(self.scan_names)  # 添加这一行进行排序
+
         self.transforms = T.Compose([
             T.ToTensor(),
             T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
+
+        print(f'{split}集数据: {len(self.scan_names)}')
 
         # self.depth_eval_transform = T.Compose([Resize(
         #     width=518,
@@ -133,10 +138,9 @@ class SYNData(Dataset):
             # print(f"target_1_4 中的唯一值: {unique_values}")
 
             # target = target_1_4[:50, :50, :25]
-            target = target_1_4
+            target = np.swapaxes(target_1_4, 0, 1)
         else:
             raise ValueError(f'voxel_size: {self.voxel_size} not supported')
-
 
         label['target'] = target
 
@@ -174,11 +178,15 @@ class SYNData(Dataset):
         img_W, img_H = img.size
         img = img.resize(((640, 480)))
         
-        W_factor = 640.0 / img_W
-        H_factor = 480.0 / img_H
-        cam_K[0] *= W_factor
-        cam_K[1] *= H_factor
-        data['cam_K'] = cam_K
+        W_factor = self.img_shape[0] / img_W
+        H_factor = self.img_shape[1] / img_H
+        scaled_camK = cam_K.copy()
+        scaled_camK[0, 0] *= W_factor
+        scaled_camK[1, 1] *= H_factor
+        scaled_camK[0, 2] *= W_factor
+        scaled_camK[1, 2] *= H_factor
+
+        data['cam_K'] = scaled_camK[:3, :3]
 
         img = np.asarray(img, dtype=np.float32) / 255.0
 
@@ -190,7 +198,7 @@ class SYNData(Dataset):
         depth_path = osp.join(self.depth_root, filename + '.png')
         depth = Image.open(depth_path)
         depth = depth.resize(((640, 480)))
-        data['depth'] = np.array(depth) / 8000.  # noqa
+        data['depth'] = np.array(depth) / 1000.  # noqa
                 
         color_im = img
         if self.use_tsdf:

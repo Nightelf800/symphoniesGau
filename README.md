@@ -64,18 +64,18 @@ honor
     |-- 000000.jpg
     |-- 000001.jpg
     ...
-|-- depth_from_camera
+|-- depth
     |-- 000000.png
     |-- 000001.png
     ...
-|-- cleaned_preprocess_voxels
+|-- voxels
     |-- 000000.pkl
     |-- 000001.pkl
     ...
 ```
 2. 软链接到代码`./data`路径下。 `ln -s 解压路径 ./data/honor_collection_data`
 3. 预处理数据。执行`tools/preprocess_honor_scene_data.py`把数据分成train和test。
-拆分规则: train: 0-650帧, test: 650帧之后
+拆分规则: train: 前80%帧, test: 后20%
 
 #### 2. 预训练权重
 
@@ -133,6 +133,12 @@ pip install mayavi==4.7.3
 
 ```
 python visualize.py --config-name config_syndata_8cm [+path=...]
+```
+
+3. 推理时保留上一帧occ预测，然后融合当前帧，最后得到当前4.8*4.8*2.88的场景occ
+
+```
+python test_scene_frame.py --config-name config_syndata_8cm [+ckpt_path=...]
 ```
 
 

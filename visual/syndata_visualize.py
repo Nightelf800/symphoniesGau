@@ -108,9 +108,9 @@ def draw_scene(
         fov_mask,
         img_size,
         f,
-        voxel_size=0.2,
-        d=7,  # 7m - determine the size of the mesh representing the camera
-        colors=None,
+        voxel_size=0.08,
+        d=0.5,  # 7m - determine the size of the mesh representing the camera
+        colors=NYU_COLORS,
         save_path=None,
         file_name=None,
         need_update_view=False,
@@ -230,9 +230,9 @@ def draw(
         fov_mask,
         img_size,
         f,
-        voxel_size=0.2,
-        d=7,  # 7m - determine the size of the mesh representing the camera
-        colors=None,
+        voxel_size=0.08,
+        d=0.5,  # 7m - determine the size of the mesh representing the camera
+        colors=NYU_COLORS,
         save_path=None,
         file_name=None,
         need_update_view=False,
@@ -356,8 +356,8 @@ def draw_gt(
         img_size,
         f,
         voxel_size=0.08,
-        d=7,  # 7m - determine the size of the mesh representing the camera
-        colors=None,
+        d=0.5,  # 7m - determine the size of the mesh representing the camera
+        colors=NYU_COLORS,
         save_path=None,
         file_name=None,
         need_update_view=False,
