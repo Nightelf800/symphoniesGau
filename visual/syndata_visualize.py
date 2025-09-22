@@ -334,7 +334,7 @@ def draw(
         # 显示场景
         mlab.show()
     else:
-        mlab.view(azimuth=-145, elevation=70, distance=7)
+        mlab.view(azimuth=60, elevation=0, distance=12)
 
         if save_path:
             os.makedirs(save_path, exist_ok=True)

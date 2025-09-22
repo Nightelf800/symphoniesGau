@@ -301,18 +301,19 @@ def main(cfg: DictConfig):
     total_time = 0.0
 
     current_scene = None
-    update_frame = False
+    update_frame = True
     
     # 添加变量来保存上一帧的数据
     prev_occ_output = None  # 上一帧的occ输出
     prev_voxel_origin = None  # 上一帧的voxel_origin
 
-    render_num = 100
+    render_num = 200
     render_idx = 0
     with torch.no_grad():
         for batch_inputs, targets in track(data_loader):
-            if render_idx >= render_num:
-                break
+            if render_idx % 10 != 0:
+                render_idx += 1
+                continue
             # print(batch_inputs.keys())
             # print('batch_inputs.name: {}'.format(batch_inputs['name']))
             scenes = batch_inputs['scene']  # 假设 'name' 标识场景
@@ -414,17 +415,18 @@ def main(cfg: DictConfig):
                 #     test_scene_evaluator.update({'ssc_logits': torch.softmax(outputs['ssc_logits'][i], dim=0).argmax(dim=0).unsqueeze(0)},
                 #                                     {'target': targets['target'][i].unsqueeze(0)})
 
-
                 print(f'############## visual ##############')
                 print(f'pred visual')
                 print(f'file: {filename}')
+                # draw('SYNData', prev_occ_output, cam_pose, prev_voxel_origin, fov_mask,
+                #      (640, 480), cam_K[0, 0], need_update_view=False)
                 draw('SYNData', prev_occ_output, cam_pose, prev_voxel_origin, fov_mask,
-                     (640, 480), cam_K[0, 0], save_path='./outputs/visual/0915/pred/', file_name=f'{filename}.png',
+                     (640, 480), cam_K[0, 0], save_path='./outputs/visual/0916/pred_10f/', file_name=f'{filename}.png',
                      need_update_view=False)
-                print(f'target visual')
-                draw('SYNData', target_np, cam_pose, prev_voxel_origin, fov_mask,
-                     (640, 480), cam_K[0, 0], save_path='./outputs/visual/0915/gt/', file_name=f'{filename}.png',
-                     need_update_view=False)
+                # print(f'target visual')
+                # draw('SYNData', target_np, cam_pose, prev_voxel_origin, fov_mask,
+                #      (640, 480), cam_K[0, 0], save_path='./outputs/visual/0915/gt/', file_name=f'{filename}.png',
+                #      need_update_view=False)
 
             current_scene = scene
 
@@ -439,7 +441,7 @@ def main(cfg: DictConfig):
 
 
         log_metrics(test_evaluator, 'val')
-        log_metrics(test_scene_evaluator, 'val', scene=True)
+        # log_metrics(test_scene_evaluator, 'val', scene=True)
 
         average_fps = total_steps / total_time  # 计算平均FPS
         print(f"Average FPS over {total_steps} steps: {average_fps:.2f}")
