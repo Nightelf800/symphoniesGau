@@ -1,7 +1,40 @@
 import os
 import shutil
 
-def split_train_and_test(folder_path):
+split_size = 10
+train_split = split_size * 9 // 10
+test_split = split_size - train_split
+
+
+# 生成训练集和测试集的索引列表
+def get_train_test_indices(sorted_unique):
+    """根据排序后的唯一索引列表，生成训练集和测试集的索引列表
+    规则：每10帧，前9帧为train，后1帧为test
+    """
+    train_indices = []
+    test_indices = []
+
+    N = len(sorted_unique)
+
+    # 对每10帧进行处理
+    for i in range(0, N, split_size):
+        # 获取当前20帧的索引范围
+        batch_end = min(i + split_size, N)
+        batch_indices = sorted_unique[i:batch_end]
+
+        # 最后1帧作为测试集（如果有足够的帧）
+        if len(batch_indices) > test_split:
+            train_indices.extend(batch_indices[:len(batch_indices) - test_split])
+            test_indices.extend(batch_indices[-test_split:])
+        elif len(batch_indices) > 0:
+            train_indices.extend(batch_indices[:len(batch_indices) - 1])
+            test_indices.append(batch_indices[-1])
+
+    return train_indices, test_indices
+
+
+# 获取排序后的唯一文件索引
+def get_sorted_unique_indices(folder_path):
     file_numbers = []
     # 遍历文件夹中的所有文件
     for filename in os.listdir(folder_path):
@@ -17,92 +50,90 @@ def split_train_and_test(folder_path):
                 # 跳过非“数字.pkl”格式的文件（如abc.pkl）
                 print(f"跳过非目标文件：{filename}")
 
-    # -------------------------- 2. 排序并计算分界值 --------------------------
     if not file_numbers:
         print("文件夹中未找到符合格式的.pkl文件！")
-    else:
-        # 1. 从小到大排序
-        sorted_numbers = sorted(file_numbers)
-        # 2. 去重（若有重复文件，保留一个）
-        sorted_unique = list(set(sorted_numbers))
-        sorted_unique.sort()  # 去重后重新排序（确保顺序正确）
-        N = len(sorted_unique)  # 有效数据总数
-        
-        # 3. 计算80%分界位置（取整数，向下取整）
-        split_index = int(N * 0.8)
-        # 注意：若split_index=0（如N=1），则所有数据属于前80%
-        if split_index == 0:
-            split_value = 0
-            print(f"数据总数过少（仅{N}个），无法划分前80%与后20%")
-        else:
-            # 分界值 = 前80%的最后一个数（或后20%的第一个数-1，根据需求表述）
-            split_value = sorted_unique[split_index - 1]  # 前80%的最后一个数
-            next_value = sorted_unique[split_index] if split_index < N else "无"  # 后20%的第一个数
-        return split_value
+        return []
+
+    # 从小到大排序
+    sorted_numbers = sorted(file_numbers)
+    # 去重（若有重复文件，保留一个）
+    sorted_unique = list(set(sorted_numbers))
+    sorted_unique.sort()  # 去重后重新排序（确保顺序正确）
+
+    return sorted_unique
+
 
 def process_honor_files():
     # 源目录和目标目录设置
     source_roots = [
         'data/honor_coll_data/honor_data_0920/20250711_1519_finterval1',
         'data/honor_coll_data/honor_data_0920/20250711_1540_finterval1'
-    ]  
+    ]
     # 保存文件路径到txt文件
     output_dir = './data/honor_coll_data/honor_data_0920/'
     os.makedirs(output_dir, exist_ok=True)
-    
+
     preprocess_folders = ['voxels']
     train_files = []
     test_files = []
-    
-    # 3. 处理每个源文件夹
+
+    # 处理每个源文件夹
     for source_root in source_roots:
         # 获取源文件夹名称作为前缀
         source_name = os.path.basename(source_root)
-        
-        # 计算当前源文件夹的分割值（使用voxels文件夹中的pkl文件）
+
+        # 获取当前源文件夹的排序后唯一索引（使用voxels文件夹中的pkl文件）
         voxels_path = os.path.join(source_root, preprocess_folders[0])
-        split_value = split_train_and_test(voxels_path)
-        
+        sorted_unique_indices = get_sorted_unique_indices(voxels_path)
+
+        if not sorted_unique_indices:
+            print(f"源文件夹 {source_root} 中没有有效的pkl文件，跳过处理")
+            continue
+
+        # 生成训练集和测试集的索引列表
+        train_indices, test_indices = get_train_test_indices(sorted_unique_indices)
+
         # 遍历当前源文件夹下的子文件夹
         for folder_name in os.listdir(source_root):
             if folder_name not in preprocess_folders:
                 continue
             folder_path = os.path.join(source_root, folder_name)
-            
+
             if not os.path.isdir(folder_path):
                 continue
-                
+
             # 处理当前文件夹中的文件
             for filename in os.listdir(folder_path):
                 if not filename.endswith(".pkl"):
                     continue
-                    
+
                 try:
                     # 提取文件名中的数字部分
                     name_part = os.path.splitext(filename)[0]
                     file_num = int(name_part)
-                    
+
                     # 构建相对路径（如：20250711_1519_finterval1/voxels/000600.pkl）
                     relative_path = f"{source_name}/{folder_name}/{filename}"
-                    
-                    # 根据分割值划分训练集和测试集
-                    if file_num <= split_value:
+
+                    # 根据索引列表划分训练集和测试集
+                    if file_num in train_indices:
                         train_files.append(relative_path)
-                    else:
+                    elif file_num in test_indices:
                         test_files.append(relative_path)
-                        
+
                 except ValueError:
                     continue
 
     # 保存训练集文件路径
-    with open(os.path.join(output_dir, 'train_files.txt'), 'w') as f:
+    with open(os.path.join(output_dir, f'train_files_split_{train_split}_{test_split}.txt'), 'w') as f:
         for path in train_files:
             f.write(f"{path}\n")
-    
+
     # 保存测试集文件路径
-    with open(os.path.join(output_dir, 'test_files.txt'), 'w') as f:
+    with open(os.path.join(output_dir, f'test_files_split_{train_split}_{test_split}.txt'), 'w') as f:
         for path in test_files:
             f.write(f"{path}\n")
+
 
 if __name__ == "__main__":
     # 执行处理

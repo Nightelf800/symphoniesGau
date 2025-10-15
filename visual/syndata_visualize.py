@@ -54,18 +54,16 @@ NYU_COLORS = np.array(
         [158, 216, 229, 255],  # 3 wall    淡青色
         [114, 158, 206, 255],  # 4 window   灰蓝色
         [204, 204, 91, 255],  # 5 chair     浅黄色
-        [255, 186, 119, 255],  # 6 bed      橙色
-        [147, 102, 188, 255],  # 7 sofa     紫色
-        [30, 119, 181, 255],  # 8 table     深蓝色
-        [188, 188, 33, 255],  # 9 tvs       亮黄色
-        [255, 127, 12, 255],  # 10 furn     橙色
-        [196, 175, 214, 255],  # 11 objs       淡紫色
-        [153, 153, 153, 255],  # 12     灰色
-        [219, 68, 55, 255],  # 12 people    深粉色
+        [30, 119, 181, 255],  # 6 table     深蓝色
+        [188, 188, 33, 255],  # 7 tvs       亮黄色
+        [255, 127, 12, 255],  # 8 furn     橙色
+        [196, 175, 214, 255],  # 9 objs       淡紫色
+        [153, 153, 153, 255],  # 10 people     灰色
+        [219, 68, 55, 255],  # 11     深粉色
     ]
 )
 
-COLORS_MAPS = ['empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa', 'table', 'tvs', 'furn', 'objs', '12']
+COLORS_MAPS = ['empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'table', 'tvs', 'furn', 'objs', 'people']
 
 
 def gt_visual_cal_fov_mask(outputs):
@@ -176,7 +174,7 @@ def draw_scene(
         mode='cube',
         opacity=1.0,
         vmin=0,
-        vmax=12)
+        vmax=10)
 
     plt_plot.glyph.scale_mode = 'scale_by_vector'
     plt_plot.module_manager.scalar_lut_manager.lut.table = colors
@@ -314,15 +312,15 @@ def draw(
     if need_update_view:
         def update_view():
             azimuth = 0
-            elevation = 0
+            elevation = 60
             roll = 0
             while True:
-                time.sleep(3)  # 每 2 秒更新一次视角
+                time.sleep(4)  # 每 2 秒更新一次视角
                 azimuth += 10  # 每次增加 10 度
-                # elevation += 20
-                # roll += 10
+                # elevation += 15
+                # roll += 15
 
-                mlab.view(azimuth=azimuth, elevation=elevation, roll=roll, distance=3)
+                mlab.view(azimuth=azimuth, elevation=elevation, distance=8)
                 print(f'azimuth: {azimuth}, elevation: {elevation}, roll: {roll}')
                 mlab.gcf().scene.render()  # 强制重绘场景
 
@@ -334,7 +332,7 @@ def draw(
         # 显示场景
         mlab.show()
     else:
-        mlab.view(azimuth=60, elevation=0, distance=12)
+        mlab.view(azimuth=210, elevation=60, distance=10)
 
         if save_path:
             os.makedirs(save_path, exist_ok=True)

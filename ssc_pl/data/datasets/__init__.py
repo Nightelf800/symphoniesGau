@@ -5,3 +5,4 @@ from .kitti_360 import KITTI360
 from .syndata import SYNData
 from .syndata_scenes import SYNDataScenes
 from .scannet import ScanNet
+from .syndata_scenes_11class import SYNDataScenes11Class

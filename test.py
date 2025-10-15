@@ -11,15 +11,16 @@ from rich.progress import track
 
 from ssc_pl import LitModule, build_data_loaders, pre_build_callbacks, build_from_configs, evaluation
 
-class_names = ['empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa',
-                        'table', 'tvs', 'furn', 'objs']
+class_names = ['empty', 'ceiling', 'floor', 'wall', 'window', 'chair',
+                        'table', 'tvs', 'furn', 'objs', 'people']
 
-def log_metrics(evaluator, prefix=None):
-    metrics = evaluator.compute()
+def log_metrics(evaluator, prefix=None, file_names_list=None):
+    metrics = evaluator.compute(file_names_list)
     iou_per_class = metrics.pop('iou_per_class')
     if prefix:
         metrics = {'/'.join((prefix, k)): v.item() for k, v in metrics.items()}
     print(f'metrics: {metrics}')
+    print(f'iou_per_class: {iou_per_class}')
     evaluator.reset()
 
 
@@ -42,19 +43,16 @@ def main(cfg: DictConfig):
     model.eval()
     total_steps = len(data_loader)
     total_time = 0.0
+    file_names_list = []
 
     with torch.no_grad():
         for batch_inputs, targets in track(data_loader):
             # print(batch_inputs.keys())
             # print('batch_inputs.name: {}'.format(batch_inputs['name']))
             targets = {key: targets[key].cuda() for key in targets}
-            # tar = targets['target']
-            # mask = torch.where((tar != 0) & (tar != 255))
-            # tar = tar[mask]
-
-            # for i in range(len(class_names)):
-            #     print('class: {}, occ: {}'.format(class_names[i], torch.sum(tar==i)/tar.size(0)))
-            
+            file_names = batch_inputs['filename'][0]
+            scene_name = batch_inputs['scene'][0]
+            file_names_list.append(f'{scene_name}_{file_names}')
 
             for key in batch_inputs:
                 if isinstance(batch_inputs[key], torch.Tensor):
@@ -69,12 +67,7 @@ def main(cfg: DictConfig):
             fps = 1 / step_time  # 计算FPS
             total_time += step_time
 
-            # preds = torch.softmax(outputs['ssc_logits'], dim=1).detach().cpu().numpy()
-            # preds = np.argmax(preds, axis=1).astype(np.uint16)
-
-            # print(f"FPS: {fps:.2f}")
-
-        log_metrics(test_evaluator, 'val')
+        log_metrics(test_evaluator, 'val', file_names_list)
 
         average_fps = total_steps / total_time  # 计算平均FPS
         print(f"Average FPS over {total_steps} steps: {average_fps:.2f}")

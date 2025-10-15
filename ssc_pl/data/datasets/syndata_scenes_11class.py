@@ -1,3 +1,4 @@
+import json
 import os.path as osp
 import glob
 
@@ -17,20 +18,22 @@ from ...engine import LitModule
 from cfg_module import ConfigManager
 from ...utils.fusion import TSDFVolume
 from torchvision.transforms.functional import InterpolationMode
+
 BICUBIC = InterpolationMode.BICUBIC
+
+
 # from featup.train_jbu_upsampler import JBUFeatUp
 
 # ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-class SYNDataScenes(Dataset):
-
+class SYNDataScenes11Class(Dataset):
     META_INFO = {
         'class_weights':
-        torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
-        'class_names': ('empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa',
+            torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
+        'class_names': ('empty', 'ceiling', 'floor', 'wall', 'window', 'chair',
                         'table', 'tvs', 'furn', 'objs', 'people'),
     }
 
-    def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
+    def __init__(self, split, data_root, label_root, voxel_size=0.08, num_classes=12, pc_range=None, depth_root=None,
                  use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = data_root
         self.label_root = data_root
@@ -38,31 +41,20 @@ class SYNDataScenes(Dataset):
         self.split = split
         self.depth_eval = depth_eval
         self.frustum_size = frustum_size
-        self.num_classes = 13
+        self.num_classes = num_classes
+        print(f'num_classes: {self.num_classes}')
         self.use_tsdf = use_tsdf
-        # self.ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-        # self.meta_info = {}
-        # self.meta_info['class_weights'] = torch.tensor([0.0500, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-        # 1.0000, 1.0000, 1.0000])
-        # self.meta_info['class_names'] = ('empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa', 'table', 'tvs', 'furn', 'objs')
-        # self.cfg = ConfigManager.get_global_cfg()
-        # self.symphony_model = LitModule.load_from_checkpoint(self.ckpt_path, **self.cfg, meta_info=self.meta_info)
-        # device = torch.device('cuda')
-        # self.upsampler = JBUFeatUp()
-        # checkpoint = torch.load('/share/lkl/Symphonies/checkpoints/maskclip_jbu_stack_cocostuff.ckpt')
-        # self.upsampler.load_state_dict(checkpoint['state_dict']).to(device)
-        # self.upsampler.eval()
         self.voxel_size = voxel_size  # meters
-        self.use_crop = use_crop    # crop or scale
+        self.use_crop = use_crop  # crop or scale
 
-        self.scene_size = (4.8, 4.8, 2.88)  # meters
+        self.scene_size = (4, 4, 2)  # meters
         # self.scene_size = (4, 4, 2)  # meters
         self.pc_range = np.array(pc_range, dtype=np.float64)
-        self.img_shape =  (640, 480)
+        self.img_shape = (640, 480)
 
         # self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
         self.scan_names = []
-        subscenes_list = f'{self.data_root}/{self.split}_files.txt'
+        subscenes_list = f'{self.data_root}/{self.split}_files_split_9_1.txt'
         print(f'subscenes_list: {subscenes_list}')
         with open(subscenes_list, 'r') as f:
             self.used_subscenes = f.readlines()
@@ -75,6 +67,7 @@ class SYNDataScenes(Dataset):
             T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
+        print(f'{split}_subscenes_list_path: {subscenes_list}')
         print(f'{split}集数据: {len(self.scan_names)}')
 
         # self.depth_eval_transform = T.Compose([Resize(
@@ -90,7 +83,6 @@ class SYNDataScenes(Dataset):
         #     PrepareForNet(),
         # ])
 
-
     def __len__(self):
         return len(self.scan_names)
 
@@ -100,7 +92,6 @@ class SYNDataScenes(Dataset):
         # filename = 'NYU0001_0000'
         # print(f'filename: {filename}')
         # print(f'scene_name: {scene_name}')
-
 
         filepath = osp.join(self.data_root, scene_name, 'voxels', filename + '.pkl')
         # print(f'filepath: {filepath}')
@@ -131,7 +122,6 @@ class SYNDataScenes(Dataset):
         voxel_origin = np.array(vox_origin)
         data['voxel_origin'] = voxel_origin
         cam_K = data_occ['intrinsic']
-        
 
         # Following SSC literature, the output resolution on NYUv2 is set to 1/4
         if self.use_crop and self.voxel_size == 0.08:
@@ -140,19 +130,23 @@ class SYNDataScenes(Dataset):
 
             # 把 >=12 并且 <255 的值都变成 0
             # target_1_4[(target_1_4 >= 12) & (target_1_4 < 255)] = 0
-            
+
             # 获取target_1_4的唯一值
             # unique_values = np.unique(target_1_4)
-            # print(f'target.shape: {target_1_4.shape}')
+            # print(f'target.unique_values: {unique_values}')
 
             # print(f"target_1_4 中的唯一值: {unique_values}")
 
-            # target = target_1_4[:50, :50, :25]
-            target = target_1_4
+            target = target_1_4[:50, :50, :25]
+            # target = target_1_4
             target = np.swapaxes(target, 0, 1)
+            target[target == 6] = 0
+            target[target == 7] = 0
+            target[(target >= 8) & (target < 255)] -= 2
+            # unique_values2 = np.unique(target)
+            # print(f'target.after.unique_values: {unique_values2}')
         else:
             raise ValueError(f'voxel_size: {self.voxel_size} not supported')
-
 
         label['target'] = target
 
@@ -161,13 +155,12 @@ class SYNDataScenes(Dataset):
 
         # compute the 3D-2D mapping
         projected_pix, fov_mask, pix_z = vox2pix(cam_pose, cam_K, voxel_origin,
-                                                 self.voxel_size, self.img_shape, self.scene_size, 
+                                                 self.voxel_size, self.img_shape, self.scene_size,
                                                  self.pc_range, filepath)
 
         # print(f'projected_pix.shape: {projected_pix.shape}')
         # print(f'fov_mask.shape: {fov_mask.shape}')
         # print(f'pix_z.shape: {pix_z.shape}')
-
 
         data['projected_pix_1'] = projected_pix
         data['fov_mask_1'] = fov_mask
@@ -189,7 +182,7 @@ class SYNDataScenes(Dataset):
         img = Image.open(img_path).convert('RGB')
         img_W, img_H = img.size
         img = img.resize(((640, 480)))
-        
+
         W_factor = self.img_shape[0] / img_W
         H_factor = self.img_shape[1] / img_H
         scaled_cam_K = cam_K.copy()
@@ -200,20 +193,18 @@ class SYNDataScenes(Dataset):
 
         data['cam_K'] = scaled_cam_K[:3, :3]
 
-        # TODO check到这里
-
         img = np.asarray(img, dtype=np.float32) / 255.0
 
         data['img'] = self.transforms(img)  # (3, H, W)
         # data['img'] = self.depth_eval_transform({'image': img})['image']  # (3, H, W)
 
-
         data['depth_eval'] = False
         depth_path = osp.join(self.data_root, scene_name, 'depth', filename + '.png')
         depth = Image.open(depth_path)
         depth = depth.resize(((640, 480)))
-        data['depth'] = np.array(depth) / 1000.  # noqa
-                
+        depth_np = np.array(depth) / 1000.  # noqa
+        data['depth'] = depth_np
+
         color_im = img
         if self.use_tsdf:
             vol_bnds = np.zeros((3, 2))
@@ -221,10 +212,11 @@ class SYNDataScenes(Dataset):
             vol_bnds[:, 1] = voxel_origin + np.array(self.scene_size)
             tsdf_volume = TSDFVolume(vol_bnds=vol_bnds, voxel_size=self.voxel_size, use_gpu=False)
             depth_im = data['depth'][0] if len(data['depth'].shape) == 3 else data['depth']
-            tsdf_volume.integrate(color_im=color_im, depth_im=depth_im, cam_intr=self.cam_K, cam_pose=np.linalg.inv(cam_pose))
+            tsdf_volume.integrate(color_im=color_im, depth_im=depth_im, cam_intr=self.cam_K,
+                                  cam_pose=np.linalg.inv(cam_pose))
             vox_tsdf, vox_tsdf_color = tsdf_volume.get_volume()
             data['vox_tsdf'] = vox_tsdf[np.newaxis, ...]
-            
+
         def ndarray_to_tensor(data: dict):
             for k, v in data.items():
                 if isinstance(v, np.ndarray):
