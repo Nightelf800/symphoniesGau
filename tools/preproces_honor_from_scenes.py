@@ -66,11 +66,11 @@ def get_sorted_unique_indices(folder_path):
 def process_honor_files():
     # 源目录和目标目录设置
     source_roots = [
-        'data/honor_coll_data/honor_data_0920/20250711_1519_finterval1',
-        'data/honor_coll_data/honor_data_0920/20250711_1540_finterval1'
+        'data/honor_data_0920/20250711_1519_finterval1',
+        'data/honor_data_0920/20250711_1540_finterval1'
     ]
     # 保存文件路径到txt文件
-    output_dir = './data/honor_coll_data/honor_data_0920/'
+    output_dir = './data/honor_data_0920/'
     os.makedirs(output_dir, exist_ok=True)
 
     preprocess_folders = ['voxels']
