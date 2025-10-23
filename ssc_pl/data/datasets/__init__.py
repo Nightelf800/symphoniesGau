@@ -6,3 +6,4 @@ from .syndata import SYNData
 from .syndata_scenes import SYNDataScenes
 from .scannet import ScanNet
 from .syndata_scenes_11class import SYNDataScenes11Class
+from .syndata_virtual_scenes_11class import SYNDataVirtualScenes11Class
