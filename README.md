@@ -56,7 +56,9 @@ pip install -r requirements.txt
 |-- voxels
 ```
 2. 分别软链接到代码`./data/honor_data_0920/`路径下。 `ln -s 解压路径 ./data/honor_data_0920/20240711_1519_finterval1`
-3. 预处理数据。执行`tools/preproces_honor_from_scenes.py`，生成 test_files_split_9_1.txt 和 train_files_split_9_1.txt 。
+3. 预处理数据。 
+方案一: 复制train_file_xxx.txt和test_file_xxx.txt到`./data/honor_data_0920/`路径下。 
+方案二: 执行`tools/preproces_honor_from_scenes.py`，生成 test_files_split_9_1.txt 和 train_files_split_9_1.txt。 
 拆分规则: 每连续的10帧，前9帧为训练帧，后1帧为测试帧。
 
 #### 预训练权重
