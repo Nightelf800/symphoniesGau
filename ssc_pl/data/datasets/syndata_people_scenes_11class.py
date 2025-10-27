@@ -25,7 +25,7 @@ BICUBIC = InterpolationMode.BICUBIC
 # from featup.train_jbu_upsampler import JBUFeatUp
 
 # ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-class SYNDataScenes11Class(Dataset):
+class SYNDataPeopleScenes11Class(Dataset):
     META_INFO = {
         'class_weights':
             torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
@@ -33,7 +33,7 @@ class SYNDataScenes11Class(Dataset):
                         'table', 'tvs', 'furn', 'objs', 'people'),
     }
 
-    def __init__(self, split, data_root, label_root, voxel_size=0.08, num_classes=12, pc_range=None, depth_root=None,
+    def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
                  use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = data_root
         self.label_root = data_root
@@ -41,8 +41,7 @@ class SYNDataScenes11Class(Dataset):
         self.split = split
         self.depth_eval = depth_eval
         self.frustum_size = frustum_size
-        self.num_classes = num_classes
-        print(f'num_classes: {self.num_classes}')
+        self.num_classes = 11
         self.use_tsdf = use_tsdf
         self.voxel_size = voxel_size  # meters
         self.use_crop = use_crop  # crop or scale
@@ -54,7 +53,7 @@ class SYNDataScenes11Class(Dataset):
 
         # self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
         self.scan_names = []
-        subscenes_list = f'{self.data_root}/{self.split}_virtual_files_split_9_1.txt'
+        subscenes_list = f'{self.data_root}/{self.split}_files_split_people.txt'
         print(f'subscenes_list: {subscenes_list}')
         with open(subscenes_list, 'r') as f:
             self.used_subscenes = f.readlines()

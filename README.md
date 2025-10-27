@@ -106,8 +106,22 @@ pip install vtk==9.0.1
 pip install mayavi==4.7.3
 ```
 
+1. 可视化测试集occ预测结果
+
 ```
 python visualize.py --config-name config_syndata_8cm_442_11class_8k +ckpt_path=...
+```
+
+2. 可视化动态物体occ预测结果
+
+```
+python visualize.py --config-name config_syndata_people_8cm_442_11class_8k +ckpt_path=...
+```
+
+3. 可视化镜面occ预测结果
+
+```
+python visualize.py --config-name config_syndata_mirror_8cm_442_11class_8k +ckpt_path=...
 ```
 
 

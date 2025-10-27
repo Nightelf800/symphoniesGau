@@ -7,3 +7,5 @@ from .syndata_scenes import SYNDataScenes
 from .scannet import ScanNet
 from .syndata_scenes_11class import SYNDataScenes11Class
 from .syndata_virtual_scenes_11class import SYNDataVirtualScenes11Class
+from .syndata_people_scenes_11class import SYNDataPeopleScenes11Class
+from .syndata_mirror_scenes_11class import SYNDataMirrorScenes11Class
