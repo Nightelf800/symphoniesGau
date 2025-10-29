@@ -26,7 +26,7 @@ BICUBIC = InterpolationMode.BICUBIC
 # from featup.train_jbu_upsampler import JBUFeatUp
 
 # ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-class SYNDataVirtualScenes11Class(Dataset):
+class SYNDataWOVirtualScenes11Class(Dataset):
     META_INFO = {
         'class_weights':
             torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
@@ -66,7 +66,7 @@ class SYNDataVirtualScenes11Class(Dataset):
 
         # self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
         self.scan_names = []
-        subscenes_list = f'{self.data_root}/{self.split}_files_split_432_30.txt'
+        subscenes_list = f'{self.data_root}/{self.split}_files_split_216_30.txt'
         print(f'subscenes_list: {subscenes_list}')
         with open(subscenes_list, 'r') as f:
             self.used_subscenes = f.readlines()
