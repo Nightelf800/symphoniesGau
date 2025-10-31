@@ -75,7 +75,6 @@ class Symphonies(nn.Module):
             overwrite = {**kwargs, "pretrained_resource": depth['depth_pretrained_resource']} if depth['depth_pretrained_resource'] else kwargs
             config = get_config(depth['depth_model_name'], "eval", depth['depth_dataset'], **overwrite)
             self.depth_eval_model = build_model(config)
-        self.save_path = '/share/lkl/features_file.pkl'
 
     def forward(self, inputs):
         if inputs['img'].dim() == 3:
@@ -98,22 +97,22 @@ class Symphonies(nn.Module):
         # print('depth_eval: {}'.format(inputs['depth_eval']))
         # print('depth_model: {}'.format(self.depth_model))
         # print('inputs[img].shape: {}'.format(inputs['img'].shape))
-        # if inputs['depth_eval']:
-        #     if self.depth_model == 'depthanything':
-        #         # depth_eval_image = self.depth_eval_transform({'image': inputs['img']})['image']
-        #         focal = torch.Tensor([715.0873]).cuda()  # This magic number (focal) is only used for evaluating BTS model
+        if inputs['use_depth_eval']:
+            if self.depth_model == 'depthanything':
+                # depth_eval_image = self.depth_eval_transform({'image': inputs['img']})['image']
+                focal = torch.Tensor([715.0873]).cuda()  # This magic number (focal) is only used for evaluating BTS model
 
-        #         with torch.no_grad():
+                with torch.no_grad():
 
-        #             depth = self.depth_infer(self.depth_eval_model, inputs['img'], dataset='nyu', focal=focal)
+                    depth = self.depth_infer(self.depth_eval_model, inputs['img'], dataset='nyu', focal=focal)
 
-        #             # depth = self.depth_eval_model(inputs['img'])['metric_depth']
-        #             # print(f'depth.shape: {depth.shape}')
-        #             depth = F.interpolate(depth, size=(h, w), mode='bilinear', align_corners=False).squeeze(1)
-        #             pred_min = depth.min()
-        #             pred_max = depth.max()
-        #             depth = (depth - pred_min) / (pred_max - pred_min) * 5.1980
-        #             inputs['depth'] = depth
+                    # depth = self.depth_eval_model(inputs['img'])['metric_depth']
+                    # print(f'depth.shape: {depth.shape}')
+                    depth = F.interpolate(depth, size=(h, w), mode='bilinear', align_corners=False).squeeze(1)
+                    pred_min = depth.min()
+                    pred_max = depth.max()
+                    depth = (depth - pred_min) / (pred_max - pred_min) * 5.1980
+                    inputs['depth'] = depth
 
         #         # print(f'depth_model: {self.depth_model}, depth.shape: {depth.shape}')
 

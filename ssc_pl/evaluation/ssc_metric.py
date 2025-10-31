@@ -1,127 +1,3 @@
-# import torch
-# from torchmetrics import Metric
-
-
-# class SSCMetrics(Metric):
-
-#     def __init__(self, num_classes, ignore_index=255):
-#         super().__init__()
-#         self.num_classes = num_classes
-#         self.ignore_index = ignore_index
-
-#         for metric in ('tp_sc', 'fp_sc', 'fn_sc'):
-#             self.add_state(metric, torch.tensor(0), dist_reduce_fx='sum')
-#         for metric in ('tps_ssc', 'fps_ssc', 'fns_ssc'):
-#             self.add_state(metric, torch.zeros(num_classes), dist_reduce_fx='sum')
-
-#     def update(self, preds, target):
-#         # print('preds.shape: {}'.format(preds['ssc_logits'].shape))
-#         # density = preds['density']
-#         dim = preds['ssc_logits'].dim()
-#         if dim == 4:
-#             preds = preds['ssc_logits']
-#         elif dim == 5:
-#             preds = torch.argmax(preds['ssc_logits'], dim=1)
-
-#         # preds = preds['result']
-#         # probs = preds['ssc_logits'].softmax(-1)
-#         # import pdb;
-#         # pdb.set_trace()
-
-#         # preds = probs.argmax(-1)
-#         # preds += 1
-#         # preds = torch.where(density.squeeze(1) > 5e-2, preds, 0)
-#         # print(f'preds.shape: {preds.shape}')
-#         target = target['target']
-#         mask = (target != self.ignore_index)
-
-#         tp, fp, fn = self._calculate_sc_scores(preds, target, mask)
-#         # print(f'tp: {tp}, fp: {fp}, fn: {fn}')
-#         self.tp_sc += tp
-#         self.fp_sc += fp
-#         self.fn_sc += fn
-
-#         tp, fp, fn = self._calculate_ssc_scores(preds, target, mask)
-#         # print(f'tp: {tp}, fp: {fp}, fn: {fn}')
-#         self.tps_ssc += tp
-#         self.fps_ssc += fp
-#         self.fns_ssc += fn
-
-#     def compute(self):
-#         if self.tp_sc != 0:
-#             precision = self.tp_sc / (self.tp_sc + self.fp_sc)
-#             recall = self.tp_sc / (self.tp_sc + self.fn_sc)
-#             iou = self.tp_sc / (self.tp_sc + self.fp_sc + self.fn_sc)
-#         else:
-#             precision, recall, iou = 0, 0, 0
-#         ious = self.tps_ssc / (self.tps_ssc + self.fps_ssc + self.fns_ssc + 1e-6)
-#         return {
-#             'Precision': precision,
-#             'Recall': recall,
-#             'IoU': iou,
-#             'iou_per_class': ious,
-#             'mIoU': ious[1:].mean()
-#         }
-
-#     def _calculate_sc_scores(self, preds, targets, nonempty=None):
-#         preds = preds.clone()
-#         targets = targets.clone()
-#         bs = preds.shape[0]
-
-#         mask = targets == self.ignore_index
-#         preds[mask] = 0
-#         targets[mask] = 0
-
-#         preds = preds.flatten(1)
-#         targets = targets.flatten(1)
-#         preds = torch.where(preds > 0, 1, 0)
-#         targets = torch.where(targets > 0, 1, 0)
-
-#         tp, fp, fn = 0, 0, 0
-#         for i in range(bs):
-#             pred = preds[i]
-#             target = targets[i]
-#             if nonempty is not None:
-#                 nonempty_ = nonempty[i].flatten()
-#                 pred = pred[nonempty_]
-#                 target = target[nonempty_]
-#             pred = pred.bool()
-#             target = target.bool()
-
-#             tp += torch.logical_and(pred, target).sum()
-#             fp += torch.logical_and(pred, ~target).sum()
-#             fn += torch.logical_and(~pred, target).sum()
-#         return tp, fp, fn
-
-#     def _calculate_ssc_scores(self, preds, targets, nonempty=None):
-#         preds = preds.clone()
-#         targets = targets.clone()
-#         bs = preds.shape[0]
-#         C = self.num_classes
-
-#         mask = targets == self.ignore_index
-#         preds[mask] = 0
-#         targets[mask] = 0
-
-#         preds = preds.flatten(1)
-#         targets = targets.flatten(1)
-
-#         tp = torch.zeros(C, dtype=torch.int).to(preds.device)
-#         fp = torch.zeros(C, dtype=torch.int).to(preds.device)
-#         fn = torch.zeros(C, dtype=torch.int).to(preds.device)
-#         for i in range(bs):
-#             pred = preds[i]
-#             target = targets[i]
-#             if nonempty is not None:
-#                 mask = nonempty[i].flatten() & (target != self.ignore_index)
-#                 pred = pred[mask]
-#                 target = target[mask]
-#             for c in range(C):
-#                 tp[c] += torch.logical_and(pred == c, target == c).sum()
-#                 fp[c] += torch.logical_and(pred == c, ~(target == c)).sum()
-#                 fn[c] += torch.logical_and(~(pred == c), target == c).sum()
-#         return tp, fp, fn
-
 import os, torch
 from torchmetrics import Metric
 from skimage.measure import label, regionprops
@@ -184,17 +60,24 @@ class SSCMetrics(Metric):
         preds_valid = preds * mask
         target_valid = target * mask
 
-        # 生成最后一个类别的二值掩码（1=该类别，0=其他）
-        pred_mask = (preds_valid == self.last_class).float()  # 形状：(B, H, W, D)
-        # print(f'pred_mask.shape: {pred_mask.shape}')
-        gt_mask = (target_valid == self.last_class).float()  # 形状：(B, H, W, D)
-        # print(f'gt_mask.shape: {gt_mask.shape}')
+        # 为每个类别生成二值掩码（1=该类别，0=其他），跳过第0类
+        batch_pred_masks = []  # 每个元素是一个类别列表
+        batch_gt_masks = []  # 每个元素是一个类别列表
+        for class_idx in range(1, self.num_classes):  # 跳过第0类
+            # 生成当前类别的二值掩码（1=该类别，0=其他）
+            pred_mask = (preds_valid == class_idx).float()  # 形状：(B, H, W, D)
+            gt_mask = (target_valid == class_idx).float()  # 形状：(B, H, W, D)
+
+            batch_pred_masks.append(pred_mask.detach().clone())
+            batch_gt_masks.append(gt_mask.detach().clone())
 
         # 存储当前batch的掩码（转为numpy便于后续处理，避免GPU内存占用）
-        self.last_class_pred_masks.append(pred_mask.detach().clone())
-        self.last_class_gt_masks.append(gt_mask.detach().clone())
+        stacked_pred_masks = torch.stack(batch_pred_masks, dim=0)
+        stacked_gt_masks = torch.stack(batch_gt_masks, dim=0)
+        self.last_class_pred_masks.append(stacked_pred_masks)
+        self.last_class_gt_masks.append(stacked_gt_masks)
 
-    def compute(self, file_names_list=None):
+    def compute(self, test=False, file_names_list=None):
         # 原有指标计算
         if self.tp_sc != 0:
             precision = self.tp_sc / (self.tp_sc + self.fp_sc)
@@ -205,7 +88,7 @@ class SSCMetrics(Metric):
         ious = self.tps_ssc / (self.tps_ssc + self.fps_ssc + self.fns_ssc + 1e-6)
 
         # 基于物体边界框的准确率计算
-        if file_names_list is not None:
+        if test:
             object_based_accuracy = self._compute_object_based_accuracy(file_names_list)
             return {
                 'Precision': precision,
@@ -213,7 +96,7 @@ class SSCMetrics(Metric):
                 'IoU': iou,
                 'iou_per_class': ious,
                 'mIoU': ious[1:].mean(),
-                'last_class_object_based_accuracy': object_based_accuracy   # 基于物体边界框的准确率
+                'object_based_accuracy_per_class': object_based_accuracy  # 基于物体边界框的准确率
             }
         else:
             return {
@@ -232,55 +115,63 @@ class SSCMetrics(Metric):
         3. 检查每个预测的last_class体素是否在任何一个GT物体的边界框内
         4. 计算准确率 = 在边界框内的预测体素数 / 总预测体素数
         """
-        total_correct_pred_voxels = 0  # 在GT物体边界框内的预测体素数
-        total_pred_voxels = 0  # 总预测体素数
-        count = 0
+        # 初始化每个类别的准确率统计
+        class_accuracies = []
+        num_valid_classes = self.num_classes - 1  # 跳过第0类
 
-        if file_names_list is not None:
-            print(f'file_names_list.len: {len(file_names_list)}')
+        for class_idx in range(num_valid_classes):
+            total_correct_pred_voxels = 0  # 在GT物体边界框内的预测体素数
+            total_pred_voxels = 0  # 总预测体素数
+            count = 0
 
-        # 遍历每个样本的预测掩码和GT掩码
-        for pred_mask, gt_mask in zip(self.last_class_pred_masks, self.last_class_gt_masks):
-            pred_mask_np = pred_mask.cpu().numpy()[0]
-            # print(f'pred_mask_np.shape: {pred_mask_np.shape}')
-            gt_mask_np = gt_mask.cpu().numpy()[0]
-            # print(f'gt_mask_np.shape: {gt_mask_np.shape}')
-            # 获取GT中物体的边界框
-            if file_names_list is not None:
-                file_name = file_names_list[count]
-            count += 1
-            gt_boxes = self._get_gt_object_boxes(gt_mask_np)
-            if not gt_boxes:  # 如果没有GT物体，跳过该样本
-                continue
+            # 遍历每个样本的预测掩码和GT掩码
+            for batch_pred_masks, batch_gt_masks in zip(self.last_class_pred_masks, self.last_class_gt_masks):
 
-            # 获取预测的last_class体素坐标
-            pred_voxel_coords = np.where(pred_mask_np > 0)  # (x, y, z) 坐标
-            num_pred_voxels = len(pred_voxel_coords[0])
-            if num_pred_voxels == 0:  # 如果没有预测体素，跳过
-                continue
+                pred_mask = batch_pred_masks[class_idx]  # 当前类别的预测掩码
+                gt_mask = batch_gt_masks[class_idx]  # 当前类别的GT掩码
 
-            # 统计在任何GT物体边界框内的预测体素数量
-            correct_voxels = 0
-            for i in range(num_pred_voxels):
-                x, y, z = pred_voxel_coords[0][i], pred_voxel_coords[1][i], pred_voxel_coords[2][i]
-                if self._is_voxel_in_any_box((x, y, z), gt_boxes):
-                    correct_voxels += 1
+                pred_mask_np = pred_mask.cpu().numpy()[0]
+                gt_mask_np = gt_mask.cpu().numpy()[0]
 
-            # 累加统计结果
-            total_correct_pred_voxels += correct_voxels
-            total_pred_voxels += num_pred_voxels
+                # 获取GT中物体的边界框
+                if file_names_list is not None:
+                    file_name = file_names_list[count]
+                count += 1
+                gt_boxes = self._get_gt_object_boxes(gt_mask_np)
+                if not gt_boxes:  # 如果没有GT物体，跳过该样本
+                    continue
 
-            if file_names_list is not None:
-                visualize_path = os.path.join("./outputs/people_bbox", f"sample_{file_name}.png")
-                self._visualize_3d_prediction(pred_mask_np, gt_boxes, visualize_path)
+                # 获取预测体素坐标
+                pred_voxel_coords = np.where(pred_mask_np > 0)  # (x, y, z) 坐标
+                num_pred_voxels = len(pred_voxel_coords[0])
+                if num_pred_voxels == 0:  # 如果没有预测体素，跳过
+                    continue
 
-        # 计算准确率
-        if total_pred_voxels > 0:
-            accuracy = total_correct_pred_voxels / total_pred_voxels
-        else:
-            accuracy = 0.0
+                # 统计在任何GT物体边界框内的预测体素数量
+                correct_voxels = 0
+                for i in range(num_pred_voxels):
+                    x, y, z = pred_voxel_coords[0][i], pred_voxel_coords[1][i], pred_voxel_coords[2][i]
+                    if self._is_voxel_in_any_box((x, y, z), gt_boxes):
+                        correct_voxels += 1
 
-        return torch.tensor(accuracy, device=self.tps_ssc.device)
+                # 累加统计结果
+                total_correct_pred_voxels += correct_voxels
+                total_pred_voxels += num_pred_voxels
+
+                if file_names_list is not None and class_idx == self.last_class - 1:  # 只为最后一个类别保存可视化
+                    visualize_path = os.path.join("./outputs/people_bbox", f"sample_{file_name}.png")
+                    self._visualize_3d_prediction(pred_mask_np, gt_boxes, visualize_path)
+
+            # 计算当前类别的准确率
+            if total_pred_voxels > 0:
+                accuracy = total_correct_pred_voxels / total_pred_voxels
+            else:
+                accuracy = 0.0
+
+            class_accuracies.append(torch.tensor(accuracy, device=self.tps_ssc.device))
+
+        # 返回每个类别的准确率张量
+        return torch.stack(class_accuracies)
 
     def _get_gt_object_boxes(self, gt_mask):
         """获取GT中每个物体的3D边界框（以体素坐标表示）"""

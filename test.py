@@ -15,12 +15,37 @@ class_names = ['empty', 'ceiling', 'floor', 'wall', 'window', 'chair',
                         'table', 'tvs', 'furn', 'objs', 'people']
 
 def log_metrics(evaluator, prefix=None, file_names_list=None):
-    metrics = evaluator.compute(file_names_list)
+    metrics = evaluator.compute(test=True, file_names_list=file_names_list)
     iou_per_class = metrics.pop('iou_per_class')
+    object_based_accuracy_per_class = metrics.pop('object_based_accuracy_per_class')
+    
+    # 按类别名称组织指标
+    class_metrics = {}
+    
+    # 添加每个类别的IoU
+    for i, class_name in enumerate(class_names):
+        class_metrics[f'iou_{class_name}'] = iou_per_class[i].item()
+    
+    # 添加除第0类外每个类别的准确率
+    for i, class_name in enumerate(class_names[1:], 1):  # 从索引1开始，跳过第0类
+        class_metrics[f'acc_{class_name}'] = object_based_accuracy_per_class[i-1].item()
+    
+    # 合并原有指标
     if prefix:
         metrics = {'/'.join((prefix, k)): v.item() for k, v in metrics.items()}
-    print(f'metrics: {metrics}')
-    print(f'iou_per_class: {iou_per_class}')
+        class_metrics = {'/'.join((prefix, k)): v for k, v in class_metrics.items()}
+    
+    # 合并所有指标
+    all_metrics = {**metrics, **class_metrics}
+    formatted_metrics = {}
+    for k, v in all_metrics.items():
+        if isinstance(v, float):
+            formatted_metrics[k] = round(v, 4)
+        else:
+            formatted_metrics[k] = v
+
+    print(f'metrics: {formatted_metrics}')
+    
     evaluator.reset()
 
 
@@ -67,10 +92,11 @@ def main(cfg: DictConfig):
             fps = 1 / step_time  # 计算FPS
             total_time += step_time
 
-        log_metrics(test_evaluator, 'val', file_names_list)
+        log_metrics(test_evaluator, 'val')
 
         average_fps = total_steps / total_time  # 计算平均FPS
         print(f"Average FPS over {total_steps} steps: {average_fps:.2f}")
+
 
 
 if __name__ == '__main__':
