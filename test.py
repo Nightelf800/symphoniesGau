@@ -87,7 +87,7 @@ def main(cfg: DictConfig):
             outputs = model(batch_inputs)
             step_time = time.time() - start_time  # 计算每步所用的时间
             if test_evaluator:
-                test_evaluator.update(outputs, targets)
+                test_evaluator.update(outputs, targets, test=True)
 
             fps = 1 / step_time  # 计算FPS
             total_time += step_time

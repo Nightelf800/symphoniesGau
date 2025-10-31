@@ -26,7 +26,7 @@ class SSCMetrics(Metric):
         self.add_state('last_class_pred_masks', default=[], dist_reduce_fx='cat')  # 预测掩码列表
         self.add_state('last_class_gt_masks', default=[], dist_reduce_fx='cat')  # 真实掩码列表
 
-    def update(self, preds, target):
+    def update(self, preds, target, test=False):
         # 解析预测和目标数据
         dim = preds['ssc_logits'].dim()
         # print(f"preds_argmax shape: {preds['ssc_logits'].shape}")
@@ -52,9 +52,10 @@ class SSCMetrics(Metric):
         self.fns_ssc += fn
 
         # 提取最后一个类别的体素掩码（用于简化3D-IoU）
-        self._update_last_class_masks(preds_argmax, target, mask)
+        if test:
+            self._update_acc_class_masks(preds_argmax, target, mask)
 
-    def _update_last_class_masks(self, preds, target, mask):
+    def _update_acc_class_masks(self, preds, target, mask):
         """提取最后一个类别的预测和真实体素掩码，存储为列表"""
         # 过滤忽略区域
         preds_valid = preds * mask
