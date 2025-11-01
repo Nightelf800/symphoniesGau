@@ -8,7 +8,6 @@ data:
     # depth_root: /data2/ylc/codes/Depth-Anything/metric_depth/nyu_no_restraint_depth_visualize
     depth_root: ./data/honor_data_0920
     label_root: ./data/honor_data_0920
-    depth_eval: false
     use_crop: true
     use_depth_eval: true
     voxel_size: 0.08

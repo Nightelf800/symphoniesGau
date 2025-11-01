@@ -7,8 +7,8 @@ data:
     data_root: ./data/honor_data_0920
     depth_root: ./data/honor_data_0920
     label_root: ./data/honor_data_0920
-    depth_eval: false
     use_crop: true
+    use_depth_eval: false
     voxel_size: 0.08
     pc_range: [0, 0, 0, 4, 4, 2]
     frustum_size: 8

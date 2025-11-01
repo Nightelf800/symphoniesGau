@@ -34,12 +34,12 @@ class SYNDataPeopleScenes11Class(Dataset):
     }
 
     def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
-                 use_crop=True, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
+                 use_crop=True, frustum_size=4, use_depth_eval=False, depth_encoder='null', use_tsdf=False):
         self.data_root = data_root
         self.label_root = data_root
         self.depth_root = data_root
         self.split = split
-        self.depth_eval = depth_eval
+        self.use_depth_eval = use_depth_eval
         self.frustum_size = frustum_size
         self.num_classes = 11
         self.use_tsdf = use_tsdf
@@ -197,12 +197,13 @@ class SYNDataPeopleScenes11Class(Dataset):
         data['img'] = self.transforms(img)  # (3, H, W)
         # data['img'] = self.depth_eval_transform({'image': img})['image']  # (3, H, W)
 
-        data['depth_eval'] = False
-        depth_path = osp.join(self.data_root, scene_name, 'depth', filename + '.png')
-        depth = Image.open(depth_path)
-        depth = depth.resize(((640, 480)))
-        depth_np = np.array(depth) / 1000.  # noqa
-        data['depth'] = depth_np
+        data['use_depth_eval'] = self.use_depth_eval
+        if not self.use_depth_eval:
+            depth_path = osp.join(self.data_root, scene_name, 'depth', filename + '.png')
+            depth = Image.open(depth_path)
+            depth = depth.resize(((640, 480)))
+            depth_np = np.array(depth) / 1000.  # noqa
+            data['depth'] = depth_np
 
         color_im = img
         if self.use_tsdf:

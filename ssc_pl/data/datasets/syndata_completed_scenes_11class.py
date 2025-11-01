@@ -1,5 +1,4 @@
 import json
-import os
 import os.path as osp
 import glob
 
@@ -26,7 +25,7 @@ BICUBIC = InterpolationMode.BICUBIC
 # from featup.train_jbu_upsampler import JBUFeatUp
 
 # ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-class SYNDataVirtualScenes11Class(Dataset):
+class SYNDataCompletedScenes11Class(Dataset):
     META_INFO = {
         'class_weights':
             torch.tensor((0.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)),
@@ -34,30 +33,19 @@ class SYNDataVirtualScenes11Class(Dataset):
                         'table', 'tvs', 'furn', 'objs', 'people'),
     }
 
-    def __init__(self, split, data_root, label_root, voxel_size=0.08, pc_range=None, depth_root=None,
-                 use_crop=True, frustum_size=4, use_depth_eval=False, depth_encoder='null', use_tsdf=False):
+    def __init__(self, split, data_root, label_root, voxel_size=0.08, num_classes=12, pc_range=None, depth_root=None,
+                 use_crop=True, use_depth_eval=False, frustum_size=4, depth_encoder='null', use_tsdf=False):
         self.data_root = data_root
         self.label_root = data_root
         self.depth_root = data_root
         self.split = split
-        self.use_depth_eval = use_depth_eval
         self.frustum_size = frustum_size
-        self.num_classes = 11
+        self.num_classes = num_classes
+        print(f'num_classes: {self.num_classes}')
         self.use_tsdf = use_tsdf
-        # self.ckpt_path = '/share/lkl/Symphonies/outputs/11_19_dim64_sym/e25_miou0.2860.ckpt'
-        # self.meta_info = {}
-        # self.meta_info['class_weights'] = torch.tensor([0.0500, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-        # 1.0000, 1.0000, 1.0000])
-        # self.meta_info['class_names'] = ('empty', 'ceiling', 'floor', 'wall', 'window', 'chair', 'bed', 'sofa', 'table', 'tvs', 'furn', 'objs')
-        # self.cfg = ConfigManager.get_global_cfg()
-        # self.symphony_model = LitModule.load_from_checkpoint(self.ckpt_path, **self.cfg, meta_info=self.meta_info)
-        # device = torch.device('cuda')
-        # self.upsampler = JBUFeatUp()
-        # checkpoint = torch.load('/share/lkl/Symphonies/checkpoints/maskclip_jbu_stack_cocostuff.ckpt')
-        # self.upsampler.load_state_dict(checkpoint['state_dict']).to(device)
-        # self.upsampler.eval()
         self.voxel_size = voxel_size  # meters
         self.use_crop = use_crop  # crop or scale
+        self.use_depth_eval = use_depth_eval
 
         self.scene_size = (4, 4, 2)  # meters
         # self.scene_size = (4, 4, 2)  # meters
@@ -66,7 +54,7 @@ class SYNDataVirtualScenes11Class(Dataset):
 
         # self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
         self.scan_names = []
-        subscenes_list = f'{self.data_root}/{self.split}_files_split_432_30.txt'
+        subscenes_list = f'{self.data_root}/{self.split}_files_split_completed_scenes.txt'
         print(f'subscenes_list: {subscenes_list}')
         with open(subscenes_list, 'r') as f:
             self.used_subscenes = f.readlines()
@@ -94,65 +82,6 @@ class SYNDataVirtualScenes11Class(Dataset):
         #     NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         #     PrepareForNet(),
         # ])
-
-    def _convert_2d_to_3d(self, box, cam_K, cam_pose, voxel_origin, depth):
-        """
-        将2D检测框内的所有像素点转换为3D世界坐标系下的点，再转换到OCC坐标系
-        box: [x1, y1, x2, y2] UI坐标系下的边界框
-        cam_K: 相机内参矩阵
-        cam_pose: 相机外参矩阵
-        voxel_origin: 体素原点
-        depth: 深度图数组，值已除以1000
-        """
-        # 确保box坐标是整数
-        x1, y1, x2, y2 = map(int, [box[0], box[1], box[2], box[3]])
-
-        # 确保坐标在图像范围内
-        height, width = depth.shape[:2]
-        x1 = max(0, x1)
-        y1 = max(0, y1)
-        x2 = min(width - 1, x2)
-        y2 = min(height - 1, y2)
-
-        # 如果边界框无效，返回空列表
-        if x1 >= x2 or y1 >= y2:
-            return []
-
-        # 生成边界框内的所有像素坐标
-        y_coords, x_coords = np.mgrid[y1:y2 + 1, x1:x2 + 1]
-        pixel_coords = np.column_stack((x_coords.ravel(), y_coords.ravel()))
-
-        # 获取对应位置的深度值
-        depth_values = depth[y1:y2 + 1, x1:x2 + 1].ravel()
-
-        # 过滤掉无效的深度值（例如0或负值）
-        valid_mask = depth_values > 0
-        valid_pixels = pixel_coords[valid_mask]
-        valid_depths = depth_values[valid_mask]
-
-        if len(valid_pixels) == 0:
-            return []
-
-        # 像素坐标到相机坐标系的转换
-        fx, fy = cam_K[0, 0], cam_K[1, 1]
-        cx, cy = cam_K[0, 2], cam_K[1, 2]
-
-        # 计算相机坐标系中的点
-        x_cam = (valid_pixels[:, 0] - cx) * valid_depths / fx
-        y_cam = (valid_pixels[:, 1] - cy) * valid_depths / fy
-        z_cam = valid_depths
-
-        # 构造齐次坐标
-        cam_points = np.column_stack((x_cam, y_cam, z_cam, np.ones_like(x_cam)))
-
-        # 相机坐标系到世界坐标系的转换
-        world_points = np.dot(cam_pose, cam_points.T).T[:, :3]
-
-        # 世界坐标系到OCC坐标系的转换
-        occ_points = (world_points - voxel_origin) / self.voxel_size
-
-        # 返回转换后的所有点
-        return occ_points.tolist()
 
     def __len__(self):
         return len(self.scan_names)
@@ -250,8 +179,6 @@ class SYNDataVirtualScenes11Class(Dataset):
         label['frustums_class_dists'] = frustums_class_dists
 
         img_path = osp.join(self.data_root, scene_name, 'color', filename + '.jpg')
-        if not os.path.isfile(img_path):
-            img_path = osp.join(self.data_root, scene_name, 'color', filename + '.png')
         img = Image.open(img_path).convert('RGB')
         img_W, img_H = img.size
         img = img.resize(((640, 480)))
@@ -266,8 +193,6 @@ class SYNDataVirtualScenes11Class(Dataset):
 
         data['cam_K'] = scaled_cam_K[:3, :3]
 
-        # TODO check到这里
-
         img = np.asarray(img, dtype=np.float32) / 255.0
 
         data['img'] = self.transforms(img)  # (3, H, W)
@@ -276,47 +201,10 @@ class SYNDataVirtualScenes11Class(Dataset):
         data['use_depth_eval'] = self.use_depth_eval
         if not self.use_depth_eval:
             depth_path = osp.join(self.data_root, scene_name, 'depth', filename + '.png')
-            if os.path.isfile(depth_path):
-                depth = Image.open(depth_path)
-                depth = depth.resize(((640, 480)))
-                depth_np = np.array(depth) / 1000.  # noqa
-            else:
-                depth_path = osp.join(self.data_root, scene_name, 'depth', filename + '.npy')
-                depth_np_ori = np.load(depth_path)
-                depth_image = Image.fromarray(depth_np_ori)
-                resized_image = depth_image.resize((640, 480), Image.LANCZOS)
-                depth_np = np.array(resized_image)
+            depth = Image.open(depth_path)
+            depth = depth.resize(((640, 480)))
+            depth_np = np.array(depth) / 1000.  # noqa
             data['depth'] = depth_np
-
-        # 添加测试集的mirror_detect处理
-        # if self.split == 'test':
-        #     # 构建JSON文件路径
-        #     json_path = f'/mnt/bn/yuanlichen0610modeleval/codes/symphoniesGau_ori/data/honor_coll_data/honor_data_0920/grounding_dino/{filename}.json'
-        #     mirror_detect = []
-
-        #     # 检查JSON文件是否存在
-        #     if osp.exists(json_path):
-        #         try:
-        #             with open(json_path, 'r') as f:
-        #                 json_data = json.load(f)
-
-        #             # 处理JSON数据
-        #             if isinstance(json_data, list) and len(json_data) > 0:
-        #                 for item in json_data:
-        #                     if 'box' in item:
-        #                         box = item['box']
-        #                         # 转换2D框到OCC坐标系
-        #                         try:
-        #                             box_occ_points = self._convert_2d_to_3d(box, cam_K, cam_pose, voxel_origin, depth_np)
-        #                             if box_occ_points:
-        #                                 mirror_detect.append(box_occ_points)
-        #                         except Exception as e:
-        #                             print(f"Error converting box {box}: {e}")
-        #         except Exception as e:
-        #             print(f"Error reading JSON file {json_path}: {e}")
-        #     mirror_detect_np = np.array(mirror_detect)
-        #     print(f'mirror_detect.shape: {mirror_detect_np.shape}')
-        #     label['mirror_detect'] = mirror_detect_np
 
         color_im = img
         if self.use_tsdf:

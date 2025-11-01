@@ -34,12 +34,11 @@ class SYNDataScenes11Class(Dataset):
     }
 
     def __init__(self, split, data_root, label_root, voxel_size=0.08, num_classes=12, pc_range=None, depth_root=None,
-                 use_crop=True, use_depth_eval=False, frustum_size=4, depth_eval=False, depth_encoder='null', use_tsdf=False):
+                 use_crop=True, use_depth_eval=False, frustum_size=4, depth_encoder='null', use_tsdf=False):
         self.data_root = data_root
         self.label_root = data_root
         self.depth_root = data_root
         self.split = split
-        self.depth_eval = depth_eval
         self.frustum_size = frustum_size
         self.num_classes = num_classes
         print(f'num_classes: {self.num_classes}')
@@ -55,7 +54,7 @@ class SYNDataScenes11Class(Dataset):
 
         # self.scan_names = glob.glob(osp.join(self.data_root, '*.jpg'))
         self.scan_names = []
-        subscenes_list = f'{self.data_root}/{self.split}_files_split_completed_scenes.txt'
+        subscenes_list = f'{self.data_root}/{self.split}_files_split_9_1.txt'
         print(f'subscenes_list: {subscenes_list}')
         with open(subscenes_list, 'r') as f:
             self.used_subscenes = f.readlines()

@@ -3,7 +3,7 @@
 # - https://hydra.cc/docs/patterns/configuring_experiments/
 
 defaults:
-  - datasets: syndata_8cm
+  - datasets: syndata_completed_scenes_8cm_442_11class_8k
   - models: symphonies
   - schedules: adamw_lr2e-4_30e
   - _self_
