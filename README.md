@@ -63,8 +63,16 @@ pip install -r requirements.txt
 
 #### 预训练权重
 
+1. Encoder MaskDINO的预训练权重
+
 MaskDINO 预训练权重下载 [here](https://github.com/hustvl/Symphonies/releases/download/v1.0/maskdino_r50_50e_300q_panoptic_pq53.0.pth)，同样保存到`./checkpoints/`路径下。
 
+2. 支持只输入RGB图像，深度图使用深度估计模型
+
+**DepthAnything:** 模型中已经内嵌DepthAnything推理模型，需下载两个权重文件，保存到`./checkpoints/`路径下。
+
+- [depth_indoor](https://huggingface.co/spaces/LiheYoung/Depth-Anything/tree/main/checkpoints_metric_depth)
+- [vitl14](https://huggingface.co/spaces/LiheYoung/Depth-Anything/blob/main/checkpoints/depth_anything_vitl14.pth)
 
 
 ## 训练
@@ -88,9 +96,18 @@ MaskDINO 预训练权重下载 [here](https://github.com/hustvl/Symphonies/relea
 
 ### 运行
 
+1. 有RGB图像对应的深度图
+
 ```
 [CUDA_VISIBLE_DEVICES=0,1,2...] python train.py --config-name config_syndata_8cm_442_11class_8k
 ```
+
+2. 使用深度估计模型预测深度
+
+```
+[CUDA_VISIBLE_DEVICES=0,1,2...] python train.py --config-name syndata_depth_eval_8cm_442_11class_8k
+```
+
 
 ## 测试
 
