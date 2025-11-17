@@ -51,7 +51,7 @@ class SymphoniesLayer(nn.Module):
                 ref_vox=None,
                 fov_mask=None):
 
-        # fov_mask = torch.ones_like(fov_mask, device=fov_mask.device)    # TODO
+        fov_mask = torch.ones_like(fov_mask, device=fov_mask.device)    # TODO
         scene_embed_fov = flatten_fov_from_voxels(scene_embed, fov_mask)
         scene_pos_fov = flatten_fov_from_voxels(scene_pos,
                                                 fov_mask) if scene_pos is not None else None
@@ -131,19 +131,19 @@ class SymphoniesDecoder(nn.Module):
             self.d_fuse = DDRBlock3D(embed_dims + embed_dims, embed_dims, embed_dims, units=1, pool=False, residual=True, batch_norm=True, inst_norm=False)
 
         self.voxel_proposal = VoxelProposalLayer(embed_dims, scene_shape)
-        # self.layers = nn.ModuleList([
-        #     SymphoniesLayer(
-        #         embed_dims,
-        #         num_levels=num_levels,
-        #         query_update=True if i != num_layers - 1 else False) for i in range(num_layers)
-        # ])
+        self.layers = nn.ModuleList([
+            SymphoniesLayer(
+                embed_dims,
+                num_levels=num_levels,
+                query_update=True if i != num_layers - 1 else False) for i in range(num_layers)
+        ])
 
         self.scene_embed = nn.Embedding(self.num_queries, embed_dims)
         self.scene_pos = LearnableSqueezePositionalEncoding((scene_shape[0] // 2,
                                                              scene_shape[1] // 2,
-                                                             scene_shape[2] // 2),
+                                                             scene_shape[2] // 5),
                                                             embed_dims,
-                                                            squeeze_dims=(2, 2, 2))
+                                                            squeeze_dims=(2, 2, 5))
 
         image_grid = generate_grid(image_shape)
         image_grid = torch.flip(image_grid, dims=[0]).unsqueeze(0)  # 2(wh), h, w
@@ -234,26 +234,20 @@ class SymphoniesDecoder(nn.Module):
         scene_pos = nlc_to_nchw(scene_pos, self.scene_shape)
 
         # new
-        scene_embed = self.aspp(scene_embed)
+        # scene_embed = self.aspp(scene_embed)
         # scene_embed = self.cls_head(scene_embed)
-
-        outs = []
-        outs.append(self.cls_head(scene_embed))
-        # 把transformer layer全部删除
         # outs = []
-        # for i, layer in enumerate(self.layers):
-        #     scene_embed, inst_queries = layer(scene_embed, inst_queries, feats, scene_pos, inst_pos,
-        #                                       ref_2d, ref_3d, ref_vox, fov_mask)
-        #     if i == 2:
-        #         scene_embed = self.aspp(scene_embed)
-        #     if self.training or i == len(self.layers) - 1:
-        #         outs.append(self.cls_head(scene_embed))
-        # 新加的
-        # scene_embed = self.cls_head(scene_embed)
-        # import pdb;
-        # pdb.set_trace()
-        # scene_embed = self.conv(scene_embed)
-        # return outs, scene_embed
+        # outs.append(self.cls_head(scene_embed))
+
+        # 把transformer layer全部删除
+        outs = []
+        for i, layer in enumerate(self.layers):
+            scene_embed, inst_queries = layer(scene_embed, inst_queries, feats, scene_pos, inst_pos,
+                                              ref_2d, ref_3d, ref_vox, fov_mask)
+            if i == 2:
+                scene_embed = self.aspp(scene_embed)
+            if self.training or i == len(self.layers) - 1:
+                outs.append(self.cls_head(scene_embed))
         return outs
 
     def generate_vol_ref_pts_from_masks(self, pred_boxes, pred_masks, vol_pts):

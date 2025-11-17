@@ -42,19 +42,7 @@ class Symphonies(nn.Module):
 
         self.encoder = build_from_configs(
             encoders, encoder, embed_dims=embed_dims, scales=view_scales)
-        # self.decoder = SymphoniesDecoder(
-        #     embed_dims,
-        #     num_classes,
-        #     num_layers=num_layers,
-        #     num_levels=len(view_scales),
-        #     scene_shape=scene_size,
-        #     project_scale=volume_scale,
-        #     image_shape=image_shape,
-        #     voxel_size=voxel_size,
-        #     pc_range = pc_range,
-        #     downsample_z=downsample_z)
-
-        self.decoder = SymphoniesDecoderMultiBS(
+        self.decoder = SymphoniesDecoder(
             embed_dims,
             num_classes,
             num_layers=num_layers,
@@ -64,8 +52,20 @@ class Symphonies(nn.Module):
             image_shape=image_shape,
             voxel_size=voxel_size,
             pc_range = pc_range,
-            downsample_z=downsample_z,
-        )
+            downsample_z=downsample_z)
+
+        # self.decoder = SymphoniesDecoderMultiBS(
+        #     embed_dims,
+        #     num_classes,
+        #     num_layers=num_layers,
+        #     num_levels=len(view_scales),
+        #     scene_shape=scene_size,
+        #     project_scale=volume_scale,
+        #     image_shape=image_shape,
+        #     voxel_size=voxel_size,
+        #     pc_range = pc_range,
+        #     downsample_z=downsample_z,
+        # )
 
         # depth_eval
         self.depth_model = depth['depth_model']
